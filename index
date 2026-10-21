@@ -1,0 +1,1447 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<title>PCP Forneria Sofia</title>
+<meta name="description" content="Painel de chão de fábrica em tempo real da Forneria Sofia">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+  :root{
+    --ground:#F1F3F1;--surface:#FFFFFF;--surface-2:#F6F8F6;--line:#DDE2DD;--line-strong:#C7CEC7;
+    --ink:#1B2320;--ink-2:#4B554F;--ink-3:#79847D;
+    --accent:#12798C;--accent-soft:#DCEEF1;--forno:#DD8A28;--forno-soft:#F8EBD3;
+    --ok:#2F8B58;--ok-soft:#DBEEE2;--warn:#D9852A;--warn-soft:#F8EBD3;--crit:#C4463A;--crit-soft:#F6DFDC;
+    --estoque:#5B6EC7;--estoque-soft:#E2E5F6;
+    --shadow:0 1px 2px rgba(27,35,32,.06),0 6px 20px rgba(27,35,32,.06);--radius:14px;
+    --fs-display:"Archivo",system-ui,sans-serif;--fs-body:"IBM Plex Sans",system-ui,sans-serif;--fs-mono:"IBM Plex Mono",ui-monospace,monospace;
+  }
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+    --ground:#111513;--surface:#1A201D;--surface-2:#222A26;--line:#2E3833;--line-strong:#3C4741;
+    --ink:#E8EDEA;--ink-2:#AEB8B2;--ink-3:#7C877F;--accent:#3FB0C4;--accent-soft:#123037;--forno:#E8A44E;--forno-soft:#3A2C15;
+    --ok:#54B47E;--ok-soft:#173026;--warn:#E0A050;--warn-soft:#3A2C15;--crit:#E0685C;--crit-soft:#3A211E;
+    --estoque:#8A9AE0;--estoque-soft:#1E2440;--shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);
+  }}
+  :root[data-theme="dark"]{
+    --ground:#111513;--surface:#1A201D;--surface-2:#222A26;--line:#2E3833;--line-strong:#3C4741;
+    --ink:#E8EDEA;--ink-2:#AEB8B2;--ink-3:#7C877F;--accent:#3FB0C4;--accent-soft:#123037;--forno:#E8A44E;--forno-soft:#3A2C15;
+    --ok:#54B47E;--ok-soft:#173026;--warn:#E0A050;--warn-soft:#3A2C15;--crit:#E0685C;--crit-soft:#3A211E;
+    --estoque:#8A9AE0;--estoque-soft:#1E2440;--shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--fs-body);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  h1,h2,h3{font-family:var(--fs-display);margin:0;text-wrap:balance;letter-spacing:-.01em}
+  button{font-family:inherit;font-size:inherit;cursor:pointer}
+  .mono,.num{font-family:var(--fs-mono);font-variant-numeric:tabular-nums}
+  .eyebrow{font-family:var(--fs-display);text-transform:uppercase;letter-spacing:.09em;font-size:11px;font-weight:700;color:var(--ink-3)}
+  .app{max-width:1180px;margin:0 auto;padding:0 18px 60px}
+  header.top{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--ground) 86%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);margin:0 -18px 20px;padding:12px 18px}
+  .top-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:11px;min-width:0}
+  .logo{width:38px;height:38px;border-radius:10px;background:var(--ink);color:var(--ground);display:grid;place-items:center;font-size:20px;flex:none}
+  .brand h1{font-size:17px;font-weight:800;line-height:1.1}
+  .brand p{margin:1px 0 0;font-size:11.5px;color:var(--ink-3);font-weight:600;letter-spacing:.02em}
+  .spacer{flex:1}
+  .status{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--ink-2);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:6px 12px}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--ink-3);flex:none}
+  .dot.live{background:var(--ok);box-shadow:0 0 0 3px var(--ok-soft)}
+  .dot.demo{background:var(--warn);box-shadow:0 0 0 3px var(--warn-soft)}
+  .perfil select{font-family:inherit;font-size:13px;font-weight:600;color:var(--ink);background:var(--surface);border:1px solid var(--line-strong);border-radius:9px;padding:7px 10px}
+  .iconbtn{background:var(--surface);border:1px solid var(--line);border-radius:9px;width:36px;height:36px;display:grid;place-items:center;color:var(--ink-2);font-size:16px}
+  nav.tabs{display:flex;gap:4px;overflow-x:auto;margin-top:12px;scrollbar-width:none}
+  nav.tabs::-webkit-scrollbar{display:none}
+  .tab{border:none;background:transparent;color:var(--ink-2);font-weight:600;font-size:13.5px;padding:9px 14px;border-radius:9px;white-space:nowrap;display:flex;align-items:center;gap:7px}
+  .tab .ti{font-size:15px}
+  .tab.active{background:var(--ink);color:var(--ground)}
+  .tab .badge{background:var(--crit);color:#fff;font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px;font-family:var(--fs-mono)}
+  .tab.active .badge{background:var(--ground);color:var(--ink)}
+  .banner{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--warn-soft);border:1px solid color-mix(in srgb,var(--warn) 40%,transparent);border-radius:12px;padding:12px 15px;margin-bottom:18px;font-size:13.5px;color:var(--ink)}
+  .banner .bspacer{flex:1}
+  .btn{border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);border-radius:9px;padding:8px 14px;font-weight:600;font-size:13.5px;display:inline-flex;align-items:center;gap:7px;transition:transform .05s}
+  .btn:active{transform:translateY(1px)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn.forno{background:var(--forno);border-color:var(--forno);color:#3a2705}
+  .btn.okb{background:var(--ok);border-color:var(--ok);color:#fff}
+  .btn.ghost{background:transparent}
+  .btn.sm{padding:5px 10px;font-size:12.5px;border-radius:8px}
+  .btn.danger{color:var(--crit);border-color:color-mix(in srgb,var(--crit) 45%,var(--line))}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .grid{display:grid;gap:14px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+  .card-h{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line)}
+  .card-h h2{font-size:14.5px;font-weight:700}
+  .card-b{padding:14px 16px}
+  .pad0 .card-b{padding:0}
+  .sec-title{display:flex;align-items:center;gap:12px;margin:2px 0 14px;flex-wrap:wrap}
+  .sec-title h2{font-size:20px;font-weight:800}
+  .sec-title p{margin:0;color:var(--ink-3);font-size:13px}
+  .tw{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+  th{font-family:var(--fs-display);font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3);font-weight:700;white-space:nowrap}
+  td.n,th.n{text-align:right;font-family:var(--fs-mono);font-variant-numeric:tabular-nums}
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr:hover{background:var(--surface-2)}
+  .pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:999px;font-family:var(--fs-display);letter-spacing:.02em;white-space:nowrap}
+  .pill.ok{background:var(--ok-soft);color:var(--ok)}
+  .pill.warn{background:var(--warn-soft);color:var(--warn)}
+  .pill.crit{background:var(--crit-soft);color:var(--crit)}
+  .pill.accent{background:var(--accent-soft);color:var(--accent)}
+  .pill.forno{background:var(--forno-soft);color:var(--forno)}
+  .pill.estoque{background:var(--estoque-soft);color:var(--estoque)}
+  .pill.mut{background:var(--surface-2);color:var(--ink-3)}
+  .stripe{width:4px;align-self:stretch;border-radius:3px;flex:none}
+  .bar{height:8px;border-radius:99px;background:var(--surface-2);overflow:hidden;min-width:70px}
+  .bar > i{display:block;height:100%;border-radius:99px;background:var(--ok)}
+  .bar > i.part{background:var(--forno)}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+  .tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:15px 16px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+  .tile .k{font-size:12px;color:var(--ink-3);font-weight:600;display:flex;align-items:center;gap:6px}
+  .tile .v{font-family:var(--fs-display);font-weight:800;font-size:30px;line-height:1.05;margin-top:8px;font-variant-numeric:tabular-nums}
+  .tile .sub{font-size:12px;color:var(--ink-2);margin-top:4px}
+  .tile.accent-t{background:linear-gradient(180deg,var(--accent-soft),var(--surface))}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field label{font-size:12px;font-weight:600;color:var(--ink-2)}
+  .field input,.field select,.field textarea{font-family:inherit;font-size:14px;color:var(--ink);background:var(--surface);border:1px solid var(--line-strong);border-radius:9px;padding:9px 11px;width:100%}
+  .field textarea{resize:vertical;min-height:64px}
+  .field input:focus,.field select:focus,.field textarea:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
+  .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+  .empty{padding:34px 16px;text-align:center;color:var(--ink-3);font-size:13.5px}
+  .muted{color:var(--ink-3)}
+  .right{margin-left:auto}
+  .rowflex{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  /* sub-nav (dias / filtros) */
+  .subnav{display:flex;gap:6px;overflow-x:auto;margin-bottom:16px;scrollbar-width:none;padding-bottom:2px}
+  .subnav::-webkit-scrollbar{display:none}
+  .chip{border:1px solid var(--line-strong);background:var(--surface);color:var(--ink-2);font-weight:600;font-size:13px;padding:7px 13px;border-radius:999px;white-space:nowrap;display:inline-flex;gap:7px;align-items:center}
+  .chip.active{background:var(--ink);color:var(--ground);border-color:var(--ink)}
+  .chip .cbadge{font-family:var(--fs-mono);font-size:11px;opacity:.8}
+  .chip.today{border-color:var(--accent);color:var(--accent)}
+  .chip.today.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .daychips{display:flex;gap:5px;flex-wrap:wrap}
+  .daychip{font-family:var(--fs-mono);font-size:11px;font-weight:600;background:var(--surface-2);border:1px solid var(--line);border-radius:7px;padding:2px 7px;color:var(--ink-2)}
+  /* dias-grid no formulário */
+  .diasgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+  .diasgrid .d{display:flex;flex-direction:column;gap:4px;align-items:center}
+  .diasgrid .d span{font-size:11px;font-weight:700;color:var(--ink-2);font-family:var(--fs-display)}
+  .diasgrid .d input{text-align:center;padding:8px 4px;font-family:var(--fs-mono)}
+  .diasgrid .d.on span{color:var(--accent)}
+  .diasgrid .d.on input{border-color:var(--accent)}
+  @media(max-width:560px){.diasgrid{grid-template-columns:repeat(4,1fr)}}
+  /* config editor */
+  .cfg-rota{display:flex;gap:6px;flex-wrap:wrap}
+  .cfg-et{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line-strong);border-radius:9px;padding:6px 11px;font-size:13px;font-weight:600;cursor:pointer;user-select:none}
+  .cfg-et.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+  .co-row{display:grid;grid-template-columns:1.4fr .7fr 1.6fr auto;gap:8px;align-items:end;margin-bottom:8px}
+  @media(max-width:640px){.co-row{grid-template-columns:1fr 1fr}}
+  .scrim{position:fixed;inset:0;background:rgba(10,14,12,.5);display:grid;place-items:center;z-index:50;padding:16px}
+  .modal{background:var(--surface);border:1px solid var(--line-strong);border-radius:16px;width:min(560px,100%);max-height:92vh;overflow:auto;box-shadow:0 24px 60px rgba(0,0,0,.3)}
+  .modal-h{display:flex;align-items:center;gap:10px;padding:16px 18px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--surface);z-index:2}
+  .modal-h h3{font-size:16px;font-weight:800}
+  .modal-b{padding:18px}
+  .modal-f{display:flex;gap:10px;padding:14px 18px;border-top:1px solid var(--line);position:sticky;bottom:0;background:var(--surface)}
+  .infobox{background:var(--forno-soft);border:1px solid color-mix(in srgb,var(--forno) 35%,transparent);border-radius:10px;padding:10px 12px;font-size:13px;margin-top:12px}
+  /* painel */
+  .painel-hero{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+  .painel-hero .clock{font-family:var(--fs-mono);font-weight:600;font-size:15px;color:var(--ink-2)}
+  .painel-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:14px}
+  .live-row{display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid var(--line)}
+  .live-row:last-child{border-bottom:none}
+  .live-row .who{font-size:12px;color:var(--ink-3)}
+  .live-row .main{font-weight:600;min-width:0;flex:1}
+  .prog-row{padding:12px 16px;border-bottom:1px solid var(--line)}
+  .prog-row:last-child{border-bottom:none}
+  .prog-top{display:flex;align-items:baseline;gap:8px;margin-bottom:7px}
+  .prog-top .p-name{font-weight:600}
+  .prog-top .p-val{margin-left:auto;font-family:var(--fs-mono);font-size:13px}
+  .gargalo-card{background:linear-gradient(160deg,var(--accent-soft),var(--surface))}
+  .gargalo-state{font-family:var(--fs-display);font-weight:800;font-size:22px;display:flex;align-items:center;gap:10px}
+  body.tv .app{max-width:100%;padding:0}
+  body.tv header.top,body.tv nav.tabs,body.tv .banner{display:none}
+  .tvwrap{display:none}
+  body.tv .tvwrap{display:block;padding:26px 30px;min-height:100vh}
+  body.tv .painel-hero .clock{font-size:22px}
+  body.tv h1.tvttl{font-size:30px}
+  body.tv .tile .v{font-size:42px}
+  body.tv .prog-top,body.tv .live-row .main{font-size:19px}
+  body.tv .prog-top .p-val{font-size:17px}
+  body.tv .gargalo-state{font-size:30px}
+  .tv-exit{position:fixed;top:14px;right:14px;z-index:60}
+  /* kanban */
+  .kbwrap{overflow-x:auto;padding-bottom:10px;margin:0 -2px}
+  .kb{display:flex;gap:12px;align-items:flex-start;min-width:min-content}
+  .kb-col{flex:0 0 250px;max-width:250px;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column}
+  .kb-col.done{background:color-mix(in srgb,var(--ok-soft) 50%,var(--surface-2))}
+  .kb-col-h{padding:10px 12px;font-family:var(--fs-display);font-weight:700;font-size:12.5px;display:flex;align-items:center;gap:7px;border-bottom:1px solid var(--line)}
+  .kb-col-h .cnt{margin-left:auto;font-family:var(--fs-mono);font-size:11px;color:var(--ink-3);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:1px 8px}
+  .kb-col-b{padding:10px;display:flex;flex-direction:column;gap:9px;min-height:50px}
+  .kb-card{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--ink-3);border-radius:10px;padding:10px 11px;box-shadow:var(--shadow)}
+  .kb-card.urg{border-left-color:var(--crit)}
+  .kb-card.gargalo{border-left-color:var(--accent)}
+  .kb-card.doing{border-left-color:var(--forno)}
+  .kb-card .t{font-weight:700;font-size:14px;line-height:1.25}
+  .kb-card .m{font-size:12px;color:var(--ink-2);margin-top:3px}
+  .kb-card .m .mono{font-size:11.5px}
+  .kb-card .act{margin-top:9px;display:flex;gap:6px;flex-wrap:wrap}
+  .kb-card .act .btn{flex:1;justify-content:center}
+  .kb-empty{color:var(--ink-3);font-size:12px;text-align:center;padding:14px 4px}
+  body.tv .kb-col{flex-basis:300px;max-width:300px}
+  body.tv .kb-card .t{font-size:17px}
+  body.tv .kb-card .act{display:none}
+  @media(max-width:820px){.painel-grid{grid-template-columns:1fr}}
+  @media(max-width:560px){.brand p{display:none}}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+</head>
+<body>
+<style>
+#login-screen{position:fixed;inset:0;z-index:100;background:var(--ground);display:flex;align-items:center;justify-content:center;padding:20px}
+#login-screen .login-box{background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:30px 26px;width:100%;max-width:360px}
+#login-screen .login-logo{display:flex;align-items:center;gap:12px;margin-bottom:22px}
+#login-screen .login-logo .logo{width:44px;height:44px;border-radius:12px;background:var(--ink);color:var(--ground);display:grid;place-items:center;font-size:22px}
+#login-screen .login-logo h1{font-size:18px;font-weight:800;font-family:var(--fs-display)}
+#login-screen .login-logo span{font-size:11px;color:var(--ink-3);display:block;margin-top:2px;font-weight:600}
+</style>
+<div id="login-screen">
+  <form class="login-box" onsubmit="entrar();return false">
+    <div class="login-logo"><div class="logo">🥖</div><div><h1>Forneria Sofia</h1><span>PCP · Chão de fábrica</span></div></div>
+    <div class="field"><label>Usuário</label><input id="l-user" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="seu nome"></div>
+    <div class="field" style="margin-top:12px"><label>Senha</label><input id="l-pass" type="password" autocomplete="current-password" placeholder="senha"></div>
+    <button class="btn primary" id="login-btn" type="submit" style="width:100%;justify-content:center;margin-top:18px;padding:12px">Entrar</button>
+    <div id="login-error" style="color:var(--crit);font-size:12.5px;text-align:center;margin-top:10px;min-height:16px"></div>
+    <div style="font-size:12px;color:var(--ink-3);text-align:center;margin-top:14px;line-height:1.5">Primeiro acesso? Use seu nome como senha.<br>Ex.: usuário <b>flavia</b> → senha <b>flavia</b></div>
+  </form>
+</div>
+<div class="app">
+  <header class="top">
+    <div class="top-row">
+      <div class="brand">
+        <div class="logo">🥖</div>
+        <div><h1>Forneria Sofia</h1><p id="brandsub">PCP · Chão de fábrica em tempo real</p></div>
+      </div>
+      <div class="spacer"></div>
+      <div class="status" id="status"><span class="dot" id="statusDot"></span><span id="statusTxt">conectando…</span></div>
+      <div class="perfil"><select id="perfilSel" aria-label="Perfil"></select></div>
+      <button class="iconbtn" id="themeBtn" title="Tema claro/escuro" aria-label="Alternar tema">◐</button>
+      <button class="iconbtn" id="pwBtn" title="Trocar senha" aria-label="Trocar senha" onclick="trocarSenha()">🔑</button>
+      <button class="iconbtn" id="outBtn" title="Sair da conta" aria-label="Sair" onclick="sairConta()">⎋</button>
+    </div>
+    <nav class="tabs" id="tabs"></nav>
+  </header>
+  <div id="banner"></div>
+  <main id="view"></main>
+</div>
+<div class="tvwrap" id="tvwrap"></div>
+<button class="btn ghost tv-exit" id="tvExit" style="display:none">✕ Sair do modo TV</button>
+<div id="modalHost"></div>
+
+<script>
+/* ===== Firebase + login (GitHub Pages / Firestore) ===== */
+var firebaseConfig={apiKey:"AIzaSyBQJDNLzwO5v9DfbDjVfAH1gKhaA9jjLZQ",authDomain:"controle-de-estoque-congelado.firebaseapp.com",projectId:"controle-de-estoque-congelado",storageBucket:"controle-de-estoque-congelado.firebasestorage.app",messagingSenderId:"796926926929",appId:"1:796926926929:web:e29c720c94492d0d54d870"};
+firebase.initializeApp(firebaseConfig);
+const FS=firebase.firestore();
+const FBCOL=n=>"pcp_"+n;                       // coleções do PCP no mesmo projeto do estoque-frio
+const USUARIOS_VALIDOS=["flavia","erik","elivelton","matheus","guilherme","iriane"];
+function hashSimples(str){var h=0;for(var i=0;i<str.length;i++){h=((h<<5)-h)+str.charCodeAt(i);h=h&h;}return h.toString();}
+let usuarioLogado=null;
+
+/* ============================================================
+   PCP Forneria Sofia — protótipo do chão de fábrica
+   Estado compartilhado em tempo real via capability "db".
+   Sem db → MODO DEMONSTRAÇÃO com dados de exemplo.
+   ============================================================ */
+const ETAPAS_ESTOQUE=["Masseira","Modelagem","Ultracongelamento"]; // fase semanal (MTS, congela cru)
+const ETAPAS_PEDIDO=["Fermentação","Assamento","Embalagem","Separação"]; // fase sob pedido
+const ETAPAS=[...ETAPAS_ESTOQUE,...ETAPAS_PEDIDO];
+const GARGALO="Ultracongelamento";
+const VER="v31-web";
+const ETAPA_ICON={Masseira:"🌀",Modelagem:"✋",Ultracongelamento:"❄️",Fermentação:"⏳",Assamento:"🔥",Embalagem:"📦",Separação:"🧺"};
+const faseEtapa=et=>ETAPAS_ESTOQUE.includes(et)?"estoque":"pedido";
+const DIAS=[{k:"seg",n:"Seg"},{k:"ter",n:"Ter"},{k:"qua",n:"Qua"},{k:"qui",n:"Qui"},{k:"sex",n:"Sex"},{k:"sab",n:"Sáb"},{k:"dom",n:"Dom"}];
+const DIA_JS=["dom","seg","ter","qua","qui","sex","sab"]; // getDay() → chave
+const CATS={ "cru":{lbl:"Cru congelado",cls:"accent"}, "assado":{lbl:"Assado e congelado",cls:"forno"}, "atender":{lbl:"Assar e atender",cls:"warn"} };
+// Áreas de processo (postos de trabalho) — o desdobramento agrupa as etapas por aqui
+const AREAS=[
+  {id:"massas",   nome:"Produção de massas",     icon:"🌀",etapas:["Masseira","Modelagem"],       fase:"estoque"},
+  {id:"ultra",    nome:"Ultracongelador",        icon:"❄️",etapas:["Ultracongelamento"],           fase:"estoque"},
+  {id:"forno",    nome:"Produção de forno",      icon:"🔥",etapas:["Fermentação","Assamento"],     fase:"pedido"},
+  {id:"expedicao",nome:"Embalagem e separação",  icon:"📦",etapas:["Embalagem","Separação"],       fase:"pedido"},
+];
+const areaDaEtapa=et=>{for(const a of AREAS)if(a.etapas.includes(et))return a.id;return "massas";};
+const areaObj=id=>AREAS.find(a=>a.id===id)||AREAS[0];
+// Masseiras disponíveis (nome · capacidade). A capacidade em kg é lida do próprio nome.
+const MASSEIRAS=["M1 15kg","M2 40kg","M3 25kg"];
+const capMasseira=m=>{const x=String(m||"").match(/(\d+)\s*kg/i);return x?Number(x[1]):null;};
+// compõe a batida de massa a partir dos lotes padrão do produto para cobrir uma quantidade-alvo
+// escolhe a combinação de lotes com o MENOR excedente acima da meta (e, em empate, menos batidas)
+function sugerirBatches(pid,alvo){
+  const lotes=((cfgOf(pid)||{}).loteMassas||[]).map(x=>({masseira:x.masseira,qtd:Number(x.qtd||0)})).filter(x=>x.qtd>0).sort((a,b)=>b.qtd-a.qtd);
+  if(!lotes.length)return null;
+  alvo=Math.max(0,Number(alvo||0));
+  if(alvo<=0)return {itens:[],total:0,temLotes:true};
+  const sizes=[...new Set(lotes.map(l=>l.qtd))];
+  const maxLot=Math.max(...sizes);
+  const LIM=alvo+maxLot; // o menor total >= alvo sempre cabe nesta janela
+  const dp=new Array(LIM+1).fill(null);dp[0]=0; // dp[t] = menor nº de batidas para somar exatamente t
+  for(let t=1;t<=LIM;t++){for(const s of sizes){if(t-s>=0&&dp[t-s]!=null&&(dp[t]==null||dp[t-s]+1<dp[t]))dp[t]=dp[t-s]+1;}}
+  let best=null;for(let t=alvo;t<=LIM;t++){if(dp[t]!=null){best=t;break;}}
+  if(best==null){ // salvaguarda: múltiplo do menor lote
+    const menor=Math.min(...sizes);const n=Math.ceil(alvo/menor);
+    const m=lotes.find(l=>l.qtd===menor);
+    return {itens:[{masseira:m.masseira,qtd:menor,n}],total:menor*n,temLotes:true};
+  }
+  // reconstrói a composição a partir do dp
+  const plan=[];let t=best;
+  while(t>0){for(const s of sizes){if(t-s>=0&&dp[t-s]!=null&&dp[t-s]+1===dp[t]){plan.push(s);t-=s;break;}}}
+  const sizeToM={};lotes.forEach(l=>{if(!(l.qtd in sizeToM))sizeToM[l.qtd]=l.masseira;});
+  const map={};plan.forEach(s=>{(map[s]=map[s]||{masseira:sizeToM[s],qtd:s,n:0}).n++;});
+  return {itens:Object.values(map).sort((a,b)=>b.qtd-a.qtd),total:plan.reduce((a,b)=>a+b,0),temLotes:true};
+}
+function fmtBatches(res){if(!res||!res.itens||!res.itens.length)return"";return res.itens.map(i=>`${i.n>1?i.n+"× ":""}${esc(i.masseira)} (${fmt(i.qtd)})`).join(" + ")+` = ${fmt(res.total)}`;}
+
+const PERFIS=[
+  {id:"guilherme",nome:"Guilherme",papel:"Planejamento / Aprovação",tab:"prog"},
+  {id:"iriane",nome:"Iriane",papel:"Líder de Produção",tab:"kprod"},
+  {id:"erik",nome:"Erik",papel:"Forneiro",tab:"kped"},
+  {id:"elivelton",nome:"Elivelton",papel:"Ultracongelamento (gargalo)",tab:"kprod"},
+  {id:"flavia",nome:"Flávia",papel:"Pedidos (Loja)",tab:"kped"},
+];
+
+// Base limpa — catálogo real + quantidade semanal sugerida (q), média de vendas
+const CATALOGO_SEED=[
+  {cod:1, id:"hb-tradicional",    nome:"HB Tradicional",                 cat:"cru",    un:"un",q:745},
+  {cod:2, id:"hb-brioche-10",     nome:"HB Brioche 10",                  cat:"cru",    un:"un",q:1188},
+  {cod:3, id:"hb-trad-60g-cx48",  nome:"HB Tradicional 60g cx 48un",     cat:"cru",    un:"un",q:405},
+  {cod:4, id:"bisnaguinha",       nome:"Bisnaguinha",                    cat:"cru",    un:"un",q:282},
+  {cod:5, id:"pao-queijo",        nome:"Pão de Queijo",                  cat:"cru",    un:"kg",q:190},
+  {cod:7, id:"italiano",          nome:"Pão Italiano",                   cat:"assado", un:"un",q:139},
+  {cod:8, id:"filao-dagua",       nome:"Filão D'Água",                   cat:"assado", un:"un",q:141},
+  {cod:9, id:"hb-brioche-8",      nome:"HB Brioche 8",                   cat:"cru",    un:"un",q:173},
+  {cod:10,id:"bisnaguinha-integral",nome:"Bisnaguinha Integral",         cat:"cru",    un:"un",q:107},
+  {cod:11,id:"rustico",           nome:"Rústico",                        cat:"assado", un:"un",q:115},
+  {cod:12,id:"croissant",         nome:"Croissant",                      cat:"assado", un:"un",q:128},
+  {cod:13,id:"hb-croc",           nome:"HB Croc",                        cat:"cru",    un:"un",q:111},
+  {cod:14,id:"hb-trad-120g-pct8", nome:"HB Tradicional 120g pct 8un",    cat:"cru",    un:"un",q:92},
+  {cod:15,id:"integral-100-forma",nome:"Integral 100% Forma",            cat:"assado", un:"un",q:59},
+  {cod:16,id:"hotdog",            nome:"Hotdog Pão",                     cat:"cru",    un:"un",q:70},
+  {cod:17,id:"panini",            nome:"Panini",                         cat:"cru",    un:"un",q:52},
+  {cod:18,id:"petropolis",        nome:"Pão Petrópolis",                 cat:"atender",un:"un",q:63},
+  {cod:19,id:"multigraos-forma",  nome:"Multigrãos Forma",               cat:"assado", un:"un",q:37},
+  {cod:20,id:"integral-forma",    nome:"Integral Forma",                 cat:"assado", un:"un",q:34},
+  {cod:21,id:"aveia-linhaca",     nome:"Pão de Aveia e Linhaça",         cat:"assado", un:"un",q:32},
+  {cod:23,id:"baguette-tradicao", nome:"Baguette Tradição",              cat:"assado", un:"un",q:34},
+  {cod:24,id:"ciabatta",          nome:"Ciabatta",                       cat:"assado", un:"un",q:34},
+  {cod:25,id:"hb-brioche-6",      nome:"HB Brioche 6",                   cat:"cru",    un:"un",q:57},
+  {cod:26,id:"baguete-croc",      nome:"Baguete Croc",                   cat:"assado", un:"un",q:30},
+  {cod:27,id:"cookie-choc-belga", nome:"Cookie Chocolate Belga B2B",     cat:"cru",    un:"un",q:32},
+  {cod:29,id:"massa-pizza",       nome:"Massa Pizza Pré-assada",         cat:"assado", un:"un",q:21},
+  {cod:31,id:"azeitonas",         nome:"Pão de Azeitonas",               cat:"assado", un:"un",q:22},
+  {cod:33,id:"cookie-duplo-choc", nome:"Cookie Duplo Chocolate B2B",     cat:"cru",    un:"un",q:25},
+  {cod:34,id:"octano",            nome:"Pão Octano",                     cat:"assado", un:"un",q:21},
+  {cod:35,id:"hb-brioche-gergelim",nome:"HB Brioche Gergelim pct 12un",  cat:"cru",    un:"un",q:39},
+  {cod:36,id:"brioche-nanterre",  nome:"Brioche Nanterre",               cat:"cru",    un:"un",q:22},
+  {cod:37,id:"muffin-choc",       nome:"Muffin Chocolate B2B",           cat:"cru",    un:"un",q:26},
+  {cod:38,id:"pao-hamburguer-trad",nome:"Pão Hambúrguer Tradicional pct 4un",cat:"cru",un:"un",q:23},
+  {cod:40,id:"passas-nozes",      nome:"Pão de Passas e Nozes",          cat:"assado", un:"un",q:11},
+  {cod:41,id:"muffin-laranja",    nome:"Muffin Laranja B2B",             cat:"cru",    un:"un",q:13},
+  {cod:44,id:"aveia-buffet",      nome:"Pão de Aveia MD Buffet",         cat:"assado", un:"un",q:8},
+  {cod:45,id:"baguette-gergelim", nome:"Baguette Gergelim",              cat:"assado", un:"un",q:8},
+  {cod:47,id:"italiano-1kg",      nome:"Pão Italiano 1kg B2B",           cat:"assado", un:"un",q:5},
+];
+
+// Configuração de etapas/regras por produto (editável só pelo Guilherme).
+// Base limpa: vazio — cada produto usa a rota padrão (estoque + pedido) até ser configurado.
+const CONFIG_SEED=[];
+
+function semanaAtual(){const d=new Date();const day=(d.getDay()+6)%7;const mon=new Date(d);mon.setDate(d.getDate()-day);
+  return String(mon.getDate()).padStart(2,"0")+"/"+String(mon.getMonth()+1).padStart(2,"0");}
+const SEM=semanaAtual();
+const HOJE_K=DIA_JS[new Date().getDay()];
+
+// Plano começa vazio: a venda média (catálogo.vms / q) é referência; a programação é criada aqui.
+const PLANO_SEED=[];
+
+const hoje=new Date().toISOString().slice(0,10);
+const tISO=h=>new Date(Date.now()-h*3600e3).toISOString();
+const PEDIDOS_SEED=[]; // base limpa — sem pedidos
+
+const APONT_SEED=[]; // base limpa — sem apontamentos
+
+/* ---------- estado ---------- */
+let DB=null,MODE="demo",unsub=[];
+let cache={catalogo:[],config:[],plano:[],pedidos:[],apont:[]};
+let perfil=loadLS("pcp_perfil","guilherme");
+let tab=(PERFIS.find(p=>p.id===perfil)||PERFIS[0]).tab;
+let progDia="semana";      // "semana" | chave do dia
+let progMode="plano";      // "plano" | "processo"
+let histProd="",histEtapa="";  // filtros do histórico
+let pedFilter="todos";     // todos|aberto|atendido|nao
+let tvView="kprod";        // "kprod" | "kped" — qual quadro no modo TV
+let cfgProd=null;          // produto em edição na config
+
+function loadLS(k,d){try{return localStorage.getItem(k)||d}catch(e){return d}}
+function saveLS(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+const $=s=>document.querySelector(s);
+const el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;};
+const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
+const prod=id=>cache.catalogo.find(p=>p.id===id)||{nome:id,un:"un",cat:"cru",rota:ETAPAS};
+const vmsDe=id=>{const P=prod(id);return Number(P.vms!=null?P.vms:(P.q||0));}; // venda média semanal (referência)
+const progSemProd=id=>cache.plano.filter(p=>p.produto===id).reduce((s,p)=>s+somaDias(p.dias),0); // já programado na semana
+const cfgOf=id=>cache.config.find(c=>c.id===id);
+const rotaDe=id=>{const c=cfgOf(id);return (c&&c.rota&&c.rota.length)?c.rota:(prod(id).rota||ETAPAS);};
+const coDe=id=>{const c=cfgOf(id);return (c&&c.co)?c.co:[];};
+const temposDe=id=>{const c=cfgOf(id);return (c&&c.tempos)?c.tempos:{};};
+function slug(s){return String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,40)||("p-"+uid());}
+function slugUnico(nome){let base=slug(nome),id=base,n=2;while(cache.catalogo.some(c=>c.id===id)){id=base+"-"+n;n++;}return id;}
+const rotaPadraoCat=()=>[...ETAPAS];
+function realizadoMedioEtapa(pid,et){const t=cache.apont.filter(a=>a.produto===pid&&a.etapa===et&&a.status==="concluido").map(a=>durMin(a.inicio,a.fim)).filter(x=>x!=null);return t.length?Math.round(t.reduce((s,x)=>s+x,0)/t.length):null;}
+const fmt=n=>Number(n||0).toLocaleString("pt-BR");
+const horaCurta=iso=>{if(!iso)return"—";return new Date(iso).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});};
+function fmtData(d){if(!d)return"";const dt=new Date(String(d).length<=10?d+"T00:00:00":d);if(isNaN(dt))return String(d);
+  const wd=dt.toLocaleDateString("pt-BR",{weekday:"short"}).replace(".","");return dt.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"})+" ("+wd+")";}
+const durMin=(a,b)=>{if(!a)return null;const f=b?new Date(b):new Date();return Math.max(0,Math.round((f-new Date(a))/60000));};
+const durTxt=m=>{if(m==null)return"—";if(m<60)return m+" min";const h=Math.floor(m/60),mm=m%60;return h+"h"+(mm?String(mm).padStart(2,"0"):"");};
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const isGui=()=>perfil==="guilherme";
+// Diálogos próprios: iframes de artifact bloqueiam window.confirm/alert.
+function toast(msg){let t=document.getElementById("toast");if(!t){t=el("div");t.id="toast";
+  t.style.cssText="position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:90;background:var(--ink);color:var(--ground);padding:11px 18px;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.3);font-size:14px;font-weight:600;max-width:90vw;text-align:center;transition:opacity .3s";document.body.appendChild(t);}
+  t.textContent=msg;t.style.opacity="1";clearTimeout(t._t);t._t=setTimeout(()=>{t.style.opacity="0";},2800);}
+function confirmar(msg,onYes,rotulo){const host=$("#modalHost");const scrim=el("div","scrim");
+  scrim.innerHTML=`<div class="modal" style="max-width:440px"><div class="modal-b" style="font-size:14.5px;line-height:1.5">${esc(msg)}</div><div class="modal-f"><button class="btn ghost" id="c_no">Cancelar</button><button class="btn danger right" id="c_yes">${esc(rotulo||"Confirmar")}</button></div></div>`;
+  const close=()=>host.innerHTML="";host.innerHTML="";host.appendChild(scrim);
+  scrim.onclick=e=>{if(e.target===scrim)close();};
+  scrim.querySelector("#c_no").onclick=close;
+  scrim.querySelector("#c_yes").onclick=async()=>{close();try{await onYes();}catch(err){toast("Erro: "+(err&&err.message||err));}};}
+function catPill(cat){const c=CATS[cat]||CATS.cru;return `<span class="pill ${c.cls}">${c.lbl}</span>`;}
+
+/* ---------- DB ---------- */
+async function initDB(){
+  setStatus("connecting");DB=FS;
+  if(!DB){MODE="demo";loadDemo();setStatus("demo");renderAll();return;}
+  try{const s=await DB.collection(FBCOL("catalogo")).limit(1).get();
+    if(s.empty){MODE="demo";loadDemo();setStatus("demo");renderAll();}
+    else{MODE="live";subscribeAll();setStatus("live");}
+  }catch(e){MODE="demo";loadDemo();setStatus("demo");renderAll();toast("Erro de conexão: "+(e&&e.message||e));}
+}
+function loadDemo(){
+  cache.catalogo=CATALOGO_SEED.map(x=>({...x}));
+  cache.config=CONFIG_SEED.map(x=>({...x}));
+  cache.plano=PLANO_SEED.map(x=>({...x}));
+  cache.pedidos=PEDIDOS_SEED.map(x=>({...x}));
+  cache.apont=APONT_SEED.map(x=>({...x}));
+}
+function subscribeAll(){
+  unsub.forEach(u=>{try{u()}catch(e){}});unsub=[];
+  const sig={};
+  const wire=(col,key)=>{const u=DB.collection(FBCOL(col)).onSnapshot(snap=>{
+    const arr=snap.docs.map(d=>({id:d.id,...d.data()}));
+    const s=JSON.stringify(arr);
+    if(sig[key]===s)return;            // nada mudou de verdade → não re-renderiza (evita churn que "mata" os botões)
+    sig[key]=s;cache[key]=arr;scheduleRender();
+  },err=>{});unsub.push(u);};
+  wire("catalogo","catalogo");wire("config","config");wire("plano","plano");wire("pedidos","pedidos");wire("apontamentos","apont");
+}
+async function seedDB(){
+  if(!DB)return;const btn=$("#seedBtn");if(btn){btn.disabled=true;btn.textContent="Inicializando…";}
+  try{
+    for(const c of CATALOGO_SEED) await DB.collection(FBCOL("catalogo")).doc(c.id).set(c);
+    for(const c of CONFIG_SEED)   await DB.collection(FBCOL("config")).doc(c.id).set(c);
+    for(const p of PLANO_SEED)    await DB.collection(FBCOL("plano")).doc(p.id).set(p);
+    for(const p of PEDIDOS_SEED)  await DB.collection(FBCOL("pedidos")).doc(p.id).set(p);
+    for(const a of APONT_SEED)    await DB.collection(FBCOL("apontamentos")).doc(a.id).set(a);
+    MODE="live";subscribeAll();setStatus("live");
+  }catch(e){toast("Não consegui inicializar: "+(e&&e.message||e));if(btn){btn.disabled=false;btn.textContent="Inicializar sistema";}}
+}
+function resetBase(){
+  confirmar("Reiniciar a base? Isso apaga TODOS os apontamentos, pedidos, configurações e o plano atual, e recarrega o catálogo com as quantidades semanais padrão.",async()=>{
+    cfgProd=null;
+    if(MODE==="live"&&DB){
+      for(const c of ["apontamentos","pedidos","plano","config","catalogo"]){
+        const snap=await DB.collection(FBCOL(c)).get();
+        for(const d of snap.docs) await DB.collection(FBCOL(c)).doc(d.id).delete();
+      }
+      await seedDB();
+    } else { loadDemo(); renderAll(); }
+    toast("Base reiniciada.");
+  },"Reiniciar base");
+}
+const colKey=c=>({catalogo:"catalogo",config:"config",plano:"plano",pedidos:"pedidos",apontamentos:"apont"}[c]);
+async function put(col,id,data){
+  // otimista: atualiza a memória e re-renderiza já; grava no banco em seguida (com erro visível)
+  const a=cache[colKey(col)];const i=a.findIndex(x=>x.id===id);if(i>=0)a[i]={...a[i],...data,id};else a.push({...data,id});renderAll();
+  if(MODE==="live"&&DB){try{await DB.collection(FBCOL(col)).doc(id).set({...data,id});}catch(e){toast("Erro ao salvar: "+(e&&e.message||e));}}
+}
+async function patch(col,id,data){
+  // patch = set do documento inteiro (merge na memória), evitando o "update exige doc existente"
+  const a=cache[colKey(col)];const i=a.findIndex(x=>x.id===id);const merged=i>=0?{...a[i],...data,id}:{...data,id};
+  if(i>=0){a[i]=merged;}else{a.push(merged);}renderAll();
+  if(MODE==="live"&&DB){try{await DB.collection(FBCOL(col)).doc(id).set(merged);}catch(e){toast("Erro ao salvar: "+(e&&e.message||e));}}
+}
+async function del(col,id){
+  const k=colKey(col);cache[k]=cache[k].filter(x=>x.id!==id);renderAll();
+  if(MODE==="live"&&DB){try{await DB.collection(FBCOL(col)).doc(id).delete();}catch(e){toast("Erro ao excluir: "+(e&&e.message||e));}}
+}
+
+/* ---------- métricas ---------- */
+function realizadoProduto(id){
+  // produzido para estoque = quantidade concluída na ETAPA FINAL de estoque (Ultracongelamento),
+  // somada entre os dias. Não somar todas as etapas (evita contar o mesmo lote várias vezes).
+  return cache.apont.filter(a=>a.produto===id&&!a.pedidoId&&a.etapa===GARGALO&&a.status==="concluido")
+    .reduce((s,a)=>s+Number(a.qtd||0),0);
+}
+function metricasEtapa(){
+  return ETAPAS.map(et=>{
+    const aps=cache.apont.filter(a=>a.etapa===et);const conc=aps.filter(a=>a.status==="concluido");
+    const t=conc.map(a=>durMin(a.inicio,a.fim)).filter(x=>x!=null);
+    const tMed=t.length?Math.round(t.reduce((s,x)=>s+x,0)/t.length):null;
+    const prodTot=conc.reduce((s,a)=>s+Number(a.qtd||0),0);
+    const perdaP=aps.reduce((s,a)=>s+Number(a.perdaProd||0),0);
+    const perdaM=aps.reduce((s,a)=>s+Number(a.perdaMP||0),0);
+    const pct=prodTot>0?(perdaP/(prodTot+perdaP))*100:(perdaP>0?100:0);
+    return{etapa:et,n:aps.length,tMed,prodTot,perdaP,perdaM,pct,andamento:aps.filter(a=>a.status==="andamento").length};
+  });
+}
+const emAndamento=()=>cache.apont.filter(a=>a.status==="andamento");
+const urgentesAbertos=()=>cache.pedidos.filter(p=>p.status==="aberto"&&p.urgente);
+const somaDias=d=>Object.values(d||{}).reduce((s,x)=>s+Number(x||0),0);
+const FASE={estoque:{lbl:"Estoque · semanal",cls:"estoque"},pedido:{lbl:"Sob pedido",cls:"forno"}};
+// status de uma tarefa desdobrada. Tarefa de pedido casa pelo pedidoId; de estoque, por produto+etapa.
+function statusTarefa(t){const aps=cache.apont.filter(a=>a.produto===t.produto&&a.etapa===t.etapa&&(t.origem==="pedido"?a.pedidoId===t.refId:!a.pedidoId));
+  if(aps.some(a=>a.status==="andamento"))return"andamento";if(aps.some(a=>a.status==="concluido"))return"concluido";return"afazer";}
+// progresso da tarefa: compara a produção apontada (concluída) com a quantidade programada
+function progressoTarefa(t){const aps=cache.apont.filter(a=>a.produto===t.produto&&a.etapa===t.etapa&&(t.origem==="pedido"?a.pedidoId===t.refId:(!a.pedidoId&&(t.dia?a.diaProg===t.dia:true))));
+  const andamento=aps.some(a=>a.status==="andamento");
+  const produced=aps.filter(a=>a.status==="concluido").reduce((s,a)=>s+Number(a.qtd||0),0);
+  const target=Number(t.qtd||0);let st;
+  if(target>0&&produced>=target)st="concluido";
+  else if(produced>0)st="parcial";
+  else if(andamento)st="andamento";
+  else st="afazer";
+  return{st,produced,target,andamento};}
+function statusEtapa(pid,et){const aps=cache.apont.filter(a=>a.produto===pid&&a.etapa===et);if(aps.some(a=>a.status==="andamento"))return"andamento";if(aps.some(a=>a.status==="concluido"))return"concluido";return"afazer";}
+// Fase ESTOQUE (semanal): massa → modelagem → ultracongelamento, a partir das quantidades da semana/dia.
+function tarefasEstoque(scope){const out=[];cache.plano.forEach(p=>{const dias=p.dias||{};
+  DIAS.forEach(d=>{const q=Number(dias[d.k]||0);if(q<=0)return;if(scope!=="semana"&&scope!==d.k)return;
+    ETAPAS_ESTOQUE.forEach(et=>out.push({origem:"plano",refId:p.id,dia:d.k,produto:p.produto,etapa:et,area:areaDaEtapa(et),fase:"estoque",qtd:q,rotulo:null}));});});return out;}
+// Fase PEDIDO: fermentação → assamento → embalagem → separação, a partir dos pedidos abertos.
+function tarefasPedido(){const out=[];cache.pedidos.filter(p=>p.status==="aceito").forEach(pd=>{
+  ETAPAS_PEDIDO.forEach(et=>out.push({origem:"pedido",refId:pd.id,produto:pd.produto,etapa:et,area:areaDaEtapa(et),fase:"pedido",qtd:Number(pd.qtd||0),rotulo:pd.cliente,spec:pd.spec,entrega:pd.entrega}));});return out;}
+/* ---------- kanban: estado da etapa por lote/pedido ---------- */
+function stApont(produto,etapa,o){o=o||{};const aps=cache.apont.filter(a=>a.produto===produto&&a.etapa===etapa&&(o.pedidoId?a.pedidoId===o.pedidoId:(!a.pedidoId&&(o.dia?a.diaProg===o.dia:true))));
+  if(aps.some(a=>a.status==="concluido"))return"concluido";if(aps.some(a=>a.status==="andamento"))return"andamento";return"afazer";}
+function producedApont(produto,etapa,o){o=o||{};return cache.apont.filter(a=>a.produto===produto&&a.etapa===etapa&&a.status==="concluido"&&(o.pedidoId?a.pedidoId===o.pedidoId:(!a.pedidoId&&(o.dia?a.diaProg===o.dia:true)))).reduce((s,a)=>s+Number(a.qtd||0),0);}
+function apontAndamento(produto,etapa,o){o=o||{};return cache.apont.find(a=>a.produto===produto&&a.etapa===etapa&&a.status==="andamento"&&(o.pedidoId?a.pedidoId===o.pedidoId:(!a.pedidoId&&a.diaProg===o.dia)));}
+function iniciarEtapa(produto,etapa,o){o=o||{};const data={id:uid(),produto,etapa,lote:o.lote||"",colab:(PERFIS.find(p=>p.id===perfil)||{}).nome||"",pedidoId:o.pedidoId||null,diaProg:(o.dia||o.diaProg||null),status:"andamento",inicio:new Date().toISOString(),fim:null,qtd:0,un:prod(produto).un,perdaProd:0,perdaMP:0,dia:hoje,obs:""};put("apontamentos",data.id,data);}
+// coluna atual de um lote/pedido = primeira etapa ainda não concluída; senão a última (pronto/entregue)
+function etapaAtual(produto,etapas,o){for(const et of etapas){if(stApont(produto,et,o)!=="concluido")return et;}return null;}
+
+/* ---------- shell ---------- */
+const TABS=[{id:"kprod",nome:"Produção",icon:"🏭"},{id:"kped",nome:"Pedidos",icon:"⚡"},{id:"prog",nome:"Planejamento",icon:"🗓️"},{id:"demanda",nome:"Vendas médias",icon:"📈"},{id:"metricas",nome:"Métricas",icon:"📊"},{id:"hist",nome:"Histórico",icon:"🗂️"}];
+function setStatus(m){const dot=$("#statusDot"),txt=$("#statusTxt");dot.className="dot";
+  if(m==="live"){dot.classList.add("live");txt.textContent="Tempo real";}
+  else if(m==="demo"){dot.classList.add("demo");txt.textContent="Demonstração";}
+  else txt.textContent="conectando…";}
+function renderPerfil(){const s=$("#perfilSel");s.innerHTML="";
+  PERFIS.forEach(p=>{const o=el("option");o.value=p.id;o.textContent=p.nome+" — "+p.papel;if(p.id===perfil)o.selected=true;s.appendChild(o);});
+  s.onchange=()=>{perfil=s.value;saveLS("pcp_perfil",perfil);const pf=PERFIS.find(x=>x.id===perfil);if(pf)tab=pf.tab;renderTabs();renderView();};}
+function renderTabs(){const n=$("#tabs");n.innerHTML="";
+  TABS.forEach(t=>{const b=el("button","tab"+(t.id===tab?" active":""));let bd="";
+    if(t.id==="kped"){const u=urgentesAbertos().length;if(u)bd=`<span class="badge">${u}</span>`;}
+    b.innerHTML=`<span class="ti">${t.icon}</span>${t.nome}${bd}`;b.onclick=()=>{tab=t.id;renderTabs();renderView();};n.appendChild(b);});}
+function renderBanner(){const b=$("#banner");b.innerHTML="";
+  if(MODE==="demo"){const box=el("div","banner");
+    box.innerHTML=`<span>📋</span><div><b>Modo demonstração.</b> Os dados abaixo são <b>exemplos</b> — nada está sendo salvo ainda.</div><div class="bspacer"></div>`;
+    if(DB){const btn=el("button","btn primary sm");btn.id="seedBtn";btn.textContent="Inicializar sistema";btn.onclick=seedDB;box.appendChild(btn);}
+    else box.appendChild(el("span","muted","(publique para ativar o banco em nuvem)"));
+    b.appendChild(box);}}
+function renderAll(){renderTabs();renderBanner();renderView();if(document.body.classList.contains("tv"))renderTV();}
+// re-render de fundo (snapshots): debounce + nunca durante um modal/toque aberto, para não destruir o botão que o usuário está tocando.
+let _rt=null;
+function scheduleRender(){clearTimeout(_rt);_rt=setTimeout(()=>{
+  if($("#modalHost").innerHTML){scheduleRender();return;} // há modal aberto → adia
+  renderAll();
+},200);}
+function renderView(){const v=$("#view");v.innerHTML="";
+  if(tab==="kprod")v.appendChild(viewKanbanProd(false));
+  if(tab==="kped")v.appendChild(viewKanbanPed(false));
+  if(tab==="prog")v.appendChild(viewProg());
+  if(tab==="demanda")v.appendChild(viewDemanda());
+  if(tab==="metricas")v.appendChild(viewMetricas());
+  if(tab==="hist")v.appendChild(viewHistorico());}
+function cardH(icon,title,extra){const h=el("div","card-h");h.innerHTML=`<span style="font-size:16px">${icon}</span><h2>${esc(title)}</h2>${extra||""}`;return h;}
+function tile(k,v,sub){const t=el("div","tile");t.innerHTML=`<div class="k">${k}</div><div class="v">${typeof v==="number"?fmt(v):esc(v)}</div><div class="sub">${esc(sub||"")}</div>`;return t;}
+const pctTxt=(a,b)=>b>0?Math.round(a/b*100)+"%":"—";
+
+/* =========================================================
+   PAINEL / TV
+   ========================================================= */
+function gargaloInfo(){const uso=emAndamento().filter(a=>a.etapa===GARGALO);return{uso,ocupado:uso.length>0};}
+function viewPainel(tv){
+  const w=el("div");
+  const hero=el("div","painel-hero");
+  hero.innerHTML=`<div><div class="eyebrow">Semana ${SEM}</div><h1 class="tvttl" style="font-size:22px;font-weight:800">Painel de Produção</h1></div>
+    <div class="clock" id="clock">${new Date().toLocaleString("pt-BR",{weekday:"short",hour:"2-digit",minute:"2-digit"})}</div>
+    <div class="right rowflex">${tv?"":'<button class="btn forno sm" id="tvBtn">📺 Modo TV</button>'}</div>`;
+  w.appendChild(hero);if(!tv){const b=hero.querySelector("#tvBtn");if(b)b.onclick=()=>enterTV("prod");}
+  const programados=cache.plano.filter(p=>somaDias(p.dias)>0); // o que está efetivamente programado na semana
+  const totMeta=programados.reduce((s,p)=>s+somaDias(p.dias),0);
+  const totReal=programados.reduce((s,p)=>s+realizadoProduto(p.produto),0);
+  const g=gargaloInfo();
+  const tiles=el("div","tiles");
+  tiles.appendChild(tile("🎯 Meta da semana",fmt(totMeta),"programado na semana"));
+  tiles.appendChild(tile("✅ Produzido",fmt(totReal),pctTxt(totReal,totMeta)+" da meta"));
+  tiles.appendChild(tile("🔧 Em produção agora",emAndamento().filter(a=>!a.pedidoId).length,"etapas de estoque em andamento"));
+  const gt=tile("❄️ Ultracongelador",g.ocupado?"EM USO":"LIVRE",g.ocupado?prod(g.uso[0].produto).nome:"gargalo ocioso");gt.classList.add("accent-t");tiles.appendChild(gt);
+  w.appendChild(tiles);w.appendChild(el("div",null,"<div style='height:14px'></div>"));
+  const grid=el("div","painel-grid");
+  const c1=el("div","card pad0");c1.appendChild(cardH("🗓️","Metas da semana × produzido"));
+  const b1=el("div");b1.style.padding="0";
+  if(!programados.length)b1.appendChild(el("div","empty","Sem programação para a semana."));
+  programados.forEach(p=>{const meta=somaDias(p.dias),real=realizadoProduto(p.produto),pct=meta?Math.min(100,Math.round(real/meta*100)):0;
+    const r=el("div","prog-row");r.innerHTML=`<div class="prog-top"><span class="p-name">${esc(prod(p.produto).nome)}</span><span class="p-val">${fmt(real)} / ${fmt(meta)} ${esc(prod(p.produto).un)}</span></div><div class="bar"><i style="width:${pct}%"></i></div>`;b1.appendChild(r);});
+  c1.appendChild(b1);grid.appendChild(c1);
+  const col=el("div","grid");col.style.alignContent="start";
+  const cg=el("div","card gargalo-card");cg.appendChild(cardH("❄️","Gargalo — Ultracongelador (o tambor)"));
+  const bg=el("div","card-b");
+  if(g.ocupado){const a=g.uso[0];bg.innerHTML=`<div class="gargalo-state"><span class="pill accent">EM USO</span></div><div style="margin-top:10px"><b>${esc(prod(a.produto).nome)}</b> · lote ${esc(a.lote||"—")}<br><span class="muted">${esc(a.colab||"")} · desde ${horaCurta(a.inicio)} (${durTxt(durMin(a.inicio))})</span></div>`;}
+  else bg.innerHTML=`<div class="gargalo-state"><span class="pill warn">LIVRE</span></div><div class="muted" style="margin-top:10px">Recurso ocioso — o TOC pede que ele nunca pare.</div>`;
+  cg.appendChild(bg);col.appendChild(cg);
+  const c2=el("div","card pad0");c2.appendChild(cardH("🔧","Em produção agora (estoque)"));const b2=el("div");b2.style.padding="0";
+  const and=emAndamento().filter(a=>!a.pedidoId);if(!and.length)b2.appendChild(el("div","empty","Nenhuma etapa de estoque em andamento."));
+  and.forEach(a=>{const r=el("div","live-row");r.innerHTML=`<div class="stripe" style="background:${a.etapa===GARGALO?'var(--accent)':'var(--forno)'}"></div><span style="font-size:18px">${ETAPA_ICON[a.etapa]||"•"}</span><div class="main"><div>${esc(prod(a.produto).nome)} · <span class="muted">${esc(a.etapa)}</span></div><div class="who">${esc(a.colab||"—")} · desde ${horaCurta(a.inicio)}</div></div>`;b2.appendChild(r);});
+  c2.appendChild(b2);col.appendChild(c2);
+  grid.appendChild(col);w.appendChild(grid);return w;
+}
+/* =========================================================
+   PAINEL PEDIDOS
+   ========================================================= */
+function viewPainelPed(tv){
+  const w=el("div");
+  const hero=el("div","painel-hero");
+  hero.innerHTML=`<div><div class="eyebrow">Semana ${SEM} · Pedidos</div><h1 class="tvttl" style="font-size:22px;font-weight:800">Painel de Pedidos</h1></div>
+    <div class="clock" id="clock">${new Date().toLocaleString("pt-BR",{weekday:"short",hour:"2-digit",minute:"2-digit"})}</div>
+    <div class="right rowflex">${tv?"":'<button class="btn forno sm" id="tvBtnP">📺 Modo TV</button>'}</div>`;
+  w.appendChild(hero);if(!tv){const b=hero.querySelector("#tvBtnP");if(b)b.onclick=()=>enterTV("ped");}
+  const byS=s=>cache.pedidos.filter(p=>p.status===s);const qS=s=>byS(s).reduce((a,p)=>a+Number(p.qtd||0),0);
+  const tiles=el("div","tiles");
+  tiles.appendChild(tile("🟡 A atender",byS("aberto").length,fmt(qS("aberto"))+" un · aguardando aceite"));
+  const t2=tile("🔵 Em produção",byS("aceito").length,fmt(qS("aceito"))+" un");t2.classList.add("accent-t");tiles.appendChild(t2);
+  tiles.appendChild(tile("🟢 Atendidos",byS("entregue").length,fmt(qS("entregue"))+" un"));
+  tiles.appendChild(tile("🔴 Não atendidos",byS("nao").length,fmt(qS("nao"))+" un"));
+  w.appendChild(tiles);w.appendChild(el("div",null,"<div style='height:14px'></div>"));
+  const grid=el("div","painel-grid");
+  const c1=el("div","card pad0");c1.appendChild(cardH("🔥","Pedidos em produção"));const b1=el("div");b1.style.padding="0";
+  const emProd=byS("aceito").slice().sort((a,b)=>String(a.entrega||"9999").localeCompare(String(b.entrega||"9999")));
+  if(!emProd.length)b1.appendChild(el("div","empty","Nenhum pedido em produção. Aceite um pedido na aba Pedidos."));
+  emProd.forEach(pd=>{const P=prod(pd.produto);
+    const sts=ETAPAS_PEDIDO.map(et=>progressoTarefa({origem:"pedido",refId:pd.id,produto:pd.produto,etapa:et,qtd:Number(pd.qtd||0)}).st);
+    const done=sts.filter(s=>s==="concluido").length;const pct=Math.round(done/ETAPAS_PEDIDO.length*100);
+    const seq=ETAPAS_PEDIDO.map((et,i)=>{const s=sts[i];const ic=s==="concluido"?"✓":s==="andamento"?"▶":s==="parcial"?"◐":"·";return `${ic} ${et}`;}).join(" · ");
+    const r=el("div","prog-row");
+    r.innerHTML=`<div class="prog-top"><span class="p-name">${esc(pd.cliente)} · ${esc(P.nome)}</span><span class="p-val">${fmt(pd.qtd)} ${esc(P.un)}${pd.entrega?" · 📅 "+esc(fmtData(pd.entrega)):""}</span></div>
+      <div class="rowflex"><div class="bar" style="flex:1"><i style="width:${pct}%"></i></div><span class="mono" style="font-size:12px">${done}/${ETAPAS_PEDIDO.length}</span></div>
+      <div class="who" style="margin-top:4px">${esc(seq)}</div>`;
+    b1.appendChild(r);});
+  c1.appendChild(b1);grid.appendChild(c1);
+  const col=el("div","grid");col.style.alignContent="start";
+  const ce=el("div","card pad0");ce.appendChild(cardH("📅","Próximas entregas"));const be=el("div");be.style.padding="0";
+  const prox=cache.pedidos.filter(p=>(p.status==="aberto"||p.status==="aceito")&&p.entrega).slice().sort((a,b)=>String(a.entrega).localeCompare(String(b.entrega)));
+  if(!prox.length)be.appendChild(el("div","empty","Nenhuma entrega com data."));
+  prox.slice(0,8).forEach(p=>{const P=prod(p.produto);const S=PED_STATUS[p.status]||PED_STATUS.aberto;
+    const r=el("div","live-row");r.innerHTML=`<div class="stripe" style="background:${p.status==="aceito"?'var(--accent)':'var(--warn)'}"></div><div class="main"><div><b>${esc(fmtData(p.entrega))}</b> · ${esc(p.cliente)}</div><div class="who">${fmt(p.qtd)} ${esc(P.un)} ${esc(P.nome)}</div></div><span class="pill ${S.cls}">${S.lbl}</span>`;be.appendChild(r);});
+  ce.appendChild(be);col.appendChild(ce);
+  const cu=el("div","card pad0");cu.appendChild(cardH("⚡","Urgentes a aceitar"));const bu=el("div");bu.style.padding="0";
+  const urg=urgentesAbertos();if(!urg.length)bu.appendChild(el("div","empty","Sem urgências abertas."));
+  urg.forEach(p=>{const r=el("div","live-row");r.innerHTML=`<div class="stripe" style="background:var(--crit)"></div><div class="main"><div><b>${esc(p.cliente)}</b> · ${fmt(p.qtd)} ${esc(prod(p.produto).un)} ${esc(prod(p.produto).nome)}</div><div class="who">${esc(p.spec||"")}${p.entrega?" · entrega "+esc(fmtData(p.entrega)):""}</div></div><span class="pill crit">URGENTE</span>`;bu.appendChild(r);});
+  cu.appendChild(bu);col.appendChild(cu);
+  grid.appendChild(col);w.appendChild(grid);return w;
+}
+/* =========================================================
+   KANBAN — Produção (MTS) e Pedidos
+   ========================================================= */
+function kbHero(w,titulo,eyebrow,tvKey,tv,extraBtns){
+  const hero=el("div","painel-hero");
+  hero.innerHTML=`<div><div class="eyebrow">${esc(eyebrow)}</div><h1 class="tvttl" style="font-size:22px;font-weight:800">${esc(titulo)}</h1></div>
+    <div class="clock" id="clock">${new Date().toLocaleString("pt-BR",{weekday:"short",hour:"2-digit",minute:"2-digit"})}</div>
+    <div class="right rowflex">${tv?"":(extraBtns||"")+'<button class="btn forno sm" id="tvBtn">📺 Modo TV</button>'}</div>`;
+  w.appendChild(hero);
+  if(!tv){const b=hero.querySelector("#tvBtn");if(b)b.onclick=()=>enterTV(tvKey);}
+  return hero;
+}
+function kbBoard(cols,porCol,cardFn){
+  const wrap=el("div","kbwrap");const kb=el("div","kb");
+  cols.forEach(c=>{const kc=el("div","kb-col"+(c.done?" done":""));
+    kc.appendChild(el("div","kb-col-h",`<span>${c.icon||""}</span>${esc(c.nome)}<span class="cnt">${(porCol[c.key]||[]).length}</span>`));
+    const b=el("div","kb-col-b");const items=porCol[c.key]||[];
+    if(!items.length)b.appendChild(el("div","kb-empty","—"));
+    items.forEach(it=>b.appendChild(cardFn(it,c)));
+    kc.appendChild(b);kb.appendChild(kc);});
+  wrap.appendChild(kb);return wrap;
+}
+function viewKanbanProd(tv){
+  const w=el("div");
+  kbHero(w,"Quadro de Produção","Semana "+SEM+" · Produção para estoque (MTS)","kprod",tv);
+  const lotes=[];
+  cache.plano.forEach(p=>{const dias=p.dias||{};DIAS.forEach(d=>{const q=Number(dias[d.k]||0);if(q>0)lotes.push({produto:p.produto,dia:d.k,qtd:q});});});
+  if(!lotes.length){const c=el("div","card");c.appendChild(el("div","empty","Nenhum lote programado. Programe a produção na aba Planejamento (distribua as quantidades pelos dias)."));w.appendChild(c);return w;}
+  const cols=ETAPAS_ESTOQUE.map(e=>({key:e,nome:e,icon:ETAPA_ICON[e]})).concat([{key:"Pronto",nome:"Pronto (estoque)",icon:"✅",done:true}]);
+  const porCol={};cols.forEach(c=>porCol[c.key]=[]);
+  lotes.forEach(L=>{const at=etapaAtual(L.produto,ETAPAS_ESTOQUE,{dia:L.dia});porCol[at||"Pronto"].push(L);});
+  w.appendChild(kbBoard(cols,porCol,(L,c)=>kcardProd(L,c.key,tv)));
+  return w;
+}
+function kcardProd(L,col,tv){
+  const P=prod(L.produto);const diaN=(DIAS.find(d=>d.k===L.dia)||{}).n||L.dia;
+  const isDone=col==="Pronto";
+  const st=isDone?"concluido":stApont(L.produto,col,{dia:L.dia});
+  const card=el("div","kb-card"+(col===GARGALO?" gargalo":"")+(st==="andamento"?" doing":""));
+  let body=`<div class="t">${esc(P.nome)}</div><div class="m">${esc(diaN)} · meta <span class="mono">${fmt(L.qtd)}</span> ${esc(P.un)}</div>`;
+  if(isDone){body+=`<div class="m">❄️ em estoque: <b>${fmt(producedApont(L.produto,GARGALO,{dia:L.dia}))}</b> ${esc(P.un)}</div>`;}
+  else{const pill=st==="andamento"?'<span class="pill warn">em andamento</span>':'<span class="pill mut">a fazer</span>';body+=`<div class="m" style="margin-top:6px">${pill}</div>`;}
+  if(col==="Masseira"&&!isDone){const res=sugerirBatches(L.produto,L.qtd);if(res&&res.itens.length){body+=`<div class="m" style="margin-top:6px;line-height:1.5">🥖 <b>${fmtBatches(res)}</b></div>`;}}
+  card.innerHTML=body;
+  if(!tv&&!isDone){const act=el("div","act");
+    const bc=el("button","btn sm okb");bc.textContent="✓ Concluir etapa ▸";bc.onclick=()=>concluirEtapa(L.produto,col,{dia:L.dia});act.appendChild(bc);
+    if(st==="afazer"){const bi=el("button","btn sm ghost");bi.style.flex="none";bi.textContent="▶";bi.title="Marcar início agora (cronometrar)";bi.onclick=()=>{iniciarEtapa(L.produto,col,{dia:L.dia});toast("Etapa iniciada — conclua quando terminar.");};act.appendChild(bi);}
+    card.appendChild(act);}
+  return card;
+}
+function viewKanbanPed(tv){
+  const w=el("div");
+  kbHero(w,"Quadro de Pedidos","Semana "+SEM+" · Pedidos","kped",tv,'<button class="btn primary sm" id="novoPed">+ Novo pedido</button>');
+  if(!tv){const nb=w.querySelector("#novoPed");if(nb)nb.onclick=()=>modalPedido();}
+  const ativos=cache.pedidos.filter(p=>p.status!=="nao");
+  if(!ativos.length){const c=el("div","card");c.appendChild(el("div","empty","Nenhum pedido ativo. Use “+ Novo pedido” para lançar um. (Recusados aparecem nas Métricas.)"));w.appendChild(c);return w;}
+  const cols=[{key:"A atender",nome:"A atender",icon:"📥"}].concat(ETAPAS_PEDIDO.map(e=>({key:e,nome:e,icon:ETAPA_ICON[e]}))).concat([{key:"Entregue",nome:"Entregue",icon:"✅",done:true}]);
+  const porCol={};cols.forEach(c=>porCol[c.key]=[]);
+  ativos.forEach(pd=>{
+    if(pd.status==="aberto"){porCol["A atender"].push(pd);return;}
+    if(pd.status==="entregue"){porCol["Entregue"].push(pd);return;}
+    const at=etapaAtual(pd.produto,ETAPAS_PEDIDO,{pedidoId:pd.id});porCol[at||"Entregue"].push(pd);
+  });
+  w.appendChild(kbBoard(cols,porCol,(pd,c)=>kcardPed(pd,c.key,tv)));
+  return w;
+}
+function kcardPed(pd,col,tv){
+  const P=prod(pd.produto);const isAtender=col==="A atender",isEntregue=col==="Entregue";
+  const doing=!isAtender&&!isEntregue&&stApont(pd.produto,col,{pedidoId:pd.id})==="andamento";
+  const card=el("div","kb-card"+(pd.urgente&&pd.status==="aberto"?" urg":"")+(doing?" doing":""));
+  let body=`<div class="t">${esc(pd.cliente)}</div><div class="m">${fmt(pd.qtd)} ${esc(P.un)} · ${esc(P.nome)}</div>`;
+  if(pd.spec)body+=`<div class="m">${esc(pd.spec)}</div>`;
+  if(pd.entrega)body+=`<div class="m">📅 ${esc(fmtData(pd.entrega))}</div>`;
+  if(pd.urgente&&pd.status==="aberto")body+=`<div class="m" style="margin-top:4px"><span class="pill crit">URGENTE</span></div>`;
+  card.innerHTML=body;
+  if(!tv){const act=el("div","act");
+    if(isAtender){
+      const ac=el("button","btn sm okb");ac.textContent="✓ Aceitar";ac.onclick=()=>patch("pedidos",pd.id,{status:"aceito"});act.appendChild(ac);
+      const na=el("button","btn sm danger");na.textContent="✕";na.title="Recusar";na.onclick=()=>confirmar("Recusar o pedido de "+pd.cliente+"?",()=>patch("pedidos",pd.id,{status:"nao"}),"Recusar");act.appendChild(na);
+    } else if(isEntregue){
+      if(pd.status!=="entregue"){const en=el("button","btn sm okb");en.textContent="✓ Confirmar entrega";en.onclick=()=>patch("pedidos",pd.id,{status:"entregue"});act.appendChild(en);}
+      else{const re=el("button","btn sm ghost");re.textContent="↩︎ Reabrir";re.onclick=()=>patch("pedidos",pd.id,{status:"aceito"});act.appendChild(re);}
+    } else {
+      const st=stApont(pd.produto,col,{pedidoId:pd.id});
+      const bc=el("button","btn sm okb");bc.textContent="✓ Concluir etapa ▸";bc.onclick=()=>concluirEtapa(pd.produto,col,{pedidoId:pd.id,lote:pd.cliente});act.appendChild(bc);
+      if(st==="afazer"){const bi=el("button","btn sm ghost");bi.style.flex="none";bi.textContent="▶";bi.title="Marcar início agora (cronometrar)";bi.onclick=()=>{iniciarEtapa(pd.produto,col,{pedidoId:pd.id,lote:pd.cliente});toast("Etapa iniciada.");};act.appendChild(bi);}
+    }
+    const ed=el("button","btn sm ghost");ed.textContent="✏️";ed.title="Editar pedido";ed.onclick=()=>modalPedido(pd);act.appendChild(ed);
+    card.appendChild(act);}
+  return card;
+}
+/* =========================================================
+   PROGRAMAÇÃO  (semana + por dia)
+   ========================================================= */
+function viewProg(){
+  const w=el("div");
+  const st=el("div","sec-title");
+  st.innerHTML=`<div><h2>Programação de Produção · Semana ${SEM}</h2><p>O que produzir para compor estoque (MTS) e atender vendas. O estoque dita o ritmo.</p></div>`;
+  const add=el("button","btn primary right");add.innerHTML="+ Item do plano";add.onclick=()=>modalPlano();st.appendChild(add);
+  w.appendChild(st);
+  // sub-nav dias
+  const sub=el("div","subnav");
+  const mkChip=(key,label,badge,isToday)=>{const c=el("button","chip"+(progDia===key?" active":"")+(isToday?" today":""));
+    c.innerHTML=label+(badge!=null?` <span class="cbadge">${badge}</span>`:"");c.onclick=()=>{progDia=key;renderView();};return c;};
+  sub.appendChild(mkChip("semana","Semana toda",cache.plano.filter(p=>somaDias(p.dias)>0).length));
+  DIAS.forEach(d=>{const itens=cache.plano.filter(p=>Number((p.dias||{})[d.k]||0)>0);const q=itens.reduce((s,p)=>s+Number(p.dias[d.k]||0),0);
+    sub.appendChild(mkChip(d.k,d.n,itens.length?fmt(q):"–",d.k===HOJE_K));});
+  w.appendChild(sub);
+  w.appendChild(progDia==="semana"?progSemana():progDoDia(progDia));
+  const note=el("p","muted");note.style.cssText="font-size:12.5px;margin-top:12px";
+  note.innerHTML="⚙️ O que for programado aqui vira cartões no <b>quadro de Produção</b>, que andam pelas etapas (masseira → modelagem → ultracongelamento). Fase seguinte: o motor de MRP calcula a <b>meta</b> a partir do estoque de segurança e do lote econômico. Por ora a meta e os dias são definidos manualmente e aprovados por você.";
+  w.appendChild(note);return w;
+}
+function progSemana(){
+  const card=el("div","card pad0");const tw=el("div","tw");const tbl=el("table");
+  tbl.innerHTML=`<thead><tr><th>Produto</th><th>Categoria</th><th>Destino</th><th class="n">Meta sem.</th><th class="n">Produzido</th><th style="width:130px">Progresso</th><th>Dias</th><th>Obs.</th><th></th></tr></thead>`;
+  const tb=el("tbody");
+  const itens=cache.plano.filter(p=>somaDias(p.dias)>0); // consolidação: só o que foi distribuído por dia
+  if(!itens.length)tb.innerHTML=`<tr><td colspan="9"><div class="empty">Nenhum produto programado nesta semana. Distribua quantidades pelos dias em “+ Item do plano” (a venda média sozinha não entra aqui).</div></td></tr>`;
+  itens.forEach(p=>{const P=prod(p.produto),meta=Number(p.meta||0),real=realizadoProduto(p.produto),pct=meta?Math.min(100,Math.round(real/meta*100)):0;
+    const chips=DIAS.filter(d=>Number((p.dias||{})[d.k]||0)>0).map(d=>`<span class="daychip">${d.n} ${fmt(p.dias[d.k])}</span>`).join(" ")||'<span class="muted">—</span>';
+    const dest=p.destino==="venda"?'<span class="pill forno">Venda</span>':'<span class="pill estoque">Estoque</span>';
+    const tr=el("tr");
+    tr.innerHTML=`<td><b>${esc(P.nome)}</b></td><td>${catPill(P.cat)}</td><td>${dest}</td>
+      <td class="n">${fmt(meta)} <span class="muted">${esc(P.un)}</span></td><td class="n">${fmt(real)}</td>
+      <td><div class="rowflex"><div class="bar" style="flex:1"><i style="width:${pct}%"></i></div><span class="mono" style="font-size:12px">${pct}%</span></div></td>
+      <td><div class="daychips">${chips}</div></td><td class="muted">${esc(p.obs||"")}</td>
+      <td class="rowflex" style="justify-content:flex-end"><button class="btn sm ghost" data-e="${p.id}">✏️</button><button class="btn sm danger" data-d="${p.id}">✕</button></td>`;
+    tr.querySelector("[data-e]").onclick=()=>modalPlano(p);
+    tr.querySelector("[data-d]").onclick=()=>confirmar("Remover "+P.nome+" do plano?",()=>del("plano",p.id),"Remover");
+    tb.appendChild(tr);});
+  tbl.appendChild(tb);tw.appendChild(tbl);card.appendChild(tw);return card;
+}
+function progDoDia(k){
+  const nome=(DIAS.find(d=>d.k===k)||{}).n||k;
+  const itens=cache.plano.filter(p=>Number((p.dias||{})[k]||0)>0);
+  const card=el("div","card pad0");
+  card.appendChild(cardH("🗓️","Programação de "+nome+(k===HOJE_K?" · hoje":""),`<span class="right eyebrow">${itens.length} produto(s)</span>`));
+  const tw=el("div","tw");const tbl=el("table");
+  tbl.innerHTML=`<thead><tr><th>Produto</th><th>Categoria</th><th>Destino</th><th class="n">Qtd do dia</th><th>Etapas (regra)</th><th>Obs.</th><th></th></tr></thead>`;
+  const tb=el("tbody");
+  if(!itens.length)tb.innerHTML=`<tr><td colspan="7"><div class="empty">Nada programado para ${esc(nome)}.</div></td></tr>`;
+  let tot=0;
+  itens.forEach(p=>{const P=prod(p.produto),q=Number(p.dias[k]||0);tot+=q;
+    const rota=rotaDe(p.produto).map(e=>ETAPA_ICON[e]||"•").join(" ");
+    const co=coDe(p.produto).map(c=>`+ ${fmt(c.qtd)} ${esc(prod(c.produto).nome)}`).join(", ");
+    const dest=p.destino==="venda"?'<span class="pill forno">Venda</span>':'<span class="pill estoque">Estoque</span>';
+    const tr=el("tr");
+    tr.innerHTML=`<td><b>${esc(P.nome)}</b>${co?`<div class="muted" style="font-size:12px">co-produção: ${co}</div>`:""}</td>
+      <td>${catPill(P.cat)}</td><td>${dest}</td><td class="n">${fmt(q)} <span class="muted">${esc(P.un)}</span></td>
+      <td style="font-size:15px" title="${esc(rotaDe(p.produto).join(' → '))}">${rota}</td><td class="muted">${esc(p.obs||"")}</td>
+      <td class="rowflex" style="justify-content:flex-end"><button class="btn sm ghost" data-e="${p.id}">✏️</button><button class="btn sm danger" data-d="${p.id}">✕</button></td>`;
+    tr.querySelector("[data-e]").onclick=()=>modalPlano(p);
+    tr.querySelector("[data-d]").onclick=()=>confirmar("Remover "+P.nome+" do plano?",()=>del("plano",p.id),"Remover");
+    tb.appendChild(tr);});
+  if(itens.length){const tr=el("tr");tr.innerHTML=`<td colspan="3" style="text-align:right;font-weight:700">Total do dia</td><td class="n" style="font-weight:700">${fmt(tot)}</td><td colspan="3"></td>`;tb.appendChild(tr);}
+  tbl.appendChild(tb);tw.appendChild(tbl);card.appendChild(tw);return card;
+}
+function viewProcesso(scope){
+  const wrap=el("div");
+  const est=tarefasEstoque(scope);
+  const ped=tarefasPedido();
+  const all=[...est,...ped];
+  const escopoTxt=scope==="semana"?"a semana toda":(DIAS.find(d=>d.k===scope)||{}).n||scope;
+  if(!all.length){const c=el("div","card");c.appendChild(el("div","empty",`Nada a produzir para ${esc(escopoTxt)}. Programe quantidades no Plano da semana ou insira pedidos.`));wrap.appendChild(c);return wrap;}
+  const stPill=(pr)=>{if(pr.st==="concluido")return `<span class="pill ok">Concluído</span> <span class="mono muted" style="font-size:11px">${fmt(pr.produced)}/${fmt(pr.target)}</span>`;
+    if(pr.st==="parcial")return `<span class="pill estoque">Parcial</span> <span class="mono" style="font-size:11px">${fmt(pr.produced)}/${fmt(pr.target)}</span>`;
+    if(pr.st==="andamento")return '<span class="pill warn">Em andamento</span>';
+    return '<span class="pill mut">A fazer</span>';};
+  AREAS.forEach(a=>{
+    const linhas=all.filter(t=>t.area===a.id);
+    if(!linhas.length)return;
+    const nCon=linhas.filter(t=>progressoTarefa(t).st==="concluido").length;
+    const faseLbl=a.fase==="estoque"?"Estoque · semanal":"Fila de pedidos";
+    const card=el("div","card pad0");card.style.marginBottom="14px";
+    card.appendChild(cardH(a.icon,a.nome,`<span class="right eyebrow">${esc(faseLbl)} · ${nCon}/${linhas.length} ok</span>`));
+    if(a.fase==="estoque")linhas.sort((x,y)=>(DIAS.findIndex(d=>d.k===x.dia)-DIAS.findIndex(d=>d.k===y.dia))||prod(x.produto).nome.localeCompare(prod(y.produto).nome));
+    else linhas.sort((x,y)=>String(x.entrega||"9999").localeCompare(String(y.entrega||"9999"))||String(x.rotulo||"").localeCompare(String(y.rotulo||"")));
+    const tw=el("div","tw");const tbl=el("table");
+    const colOrigem=a.fase==="pedido"?"<th>Cliente / entrega</th>":"<th>Dia</th>";
+    tbl.innerHTML=`<thead><tr><th>Produto</th><th>Etapa</th>${colOrigem}<th class="n">Qtd</th><th>Status</th><th></th></tr></thead>`;
+    const tb=el("tbody");
+    linhas.forEach(t=>{const P=prod(t.produto),pr=progressoTarefa(t);
+      const diaN=(DIAS.find(d=>d.k===t.dia)||{}).n||"—";
+      const origem=t.origem==="pedido"
+        ?`<b>${esc(t.rotulo||"")}</b>${t.entrega?` <span class="pill forno" title="Data de entrega">📅 ${esc(fmtData(t.entrega))}</span>`:' <span class="pill mut">sem data</span>'}${t.spec?`<div class="muted" style="font-size:12px">${esc(t.spec)}</div>`:""}`
+        :`<span class="pill mut">${esc(diaN)}</span>`;
+      let acao="";
+      if(pr.andamento)acao=`<button class="btn sm okb" data-f="1">Finalizar ▸</button>`;
+      else if(pr.st==="concluido")acao=`<button class="btn sm ghost" data-i="1">+ Novo lote</button>`;
+      else if(pr.st==="parcial")acao=`<button class="btn sm primary" data-i="1">▶ Completar</button>`;
+      else acao=`<button class="btn sm primary" data-i="1">▶ Iniciar</button>`;
+      const tr=el("tr");
+      tr.innerHTML=`<td><b>${esc(P.nome)}</b></td><td>${ETAPA_ICON[t.etapa]||""} ${esc(t.etapa)}${t.etapa===GARGALO?' <span class="pill accent" style="margin-left:2px">gargalo</span>':""}</td>
+        <td>${origem}</td><td class="n">${fmt(t.qtd)} <span class="muted">${esc(P.un)}</span></td>
+        <td>${stPill(pr)}</td><td class="rowflex" style="justify-content:flex-end">${acao}</td>`;
+      const bi=tr.querySelector("[data-i]"),bf=tr.querySelector("[data-f]");
+      const prefill={produto:t.produto,etapa:t.etapa,pedidoId:t.origem==="pedido"?t.refId:null,diaProg:t.origem==="plano"?t.dia:null,lote:t.origem==="pedido"?t.rotulo:""};
+      if(bi)bi.onclick=()=>modalApont(prefill);
+      if(bf)bf.onclick=()=>{const ap=cache.apont.find(x=>x.produto===t.produto&&x.etapa===t.etapa&&x.status==="andamento"&&(t.origem==="pedido"?x.pedidoId===t.refId:(!x.pedidoId&&x.diaProg===t.dia)));if(ap)modalFinalizar(ap);};
+      tb.appendChild(tr);});
+    tbl.appendChild(tb);tw.appendChild(tbl);card.appendChild(tw);wrap.appendChild(card);
+  });
+  return wrap;
+}
+function modalPlano(p){
+  const isNew=!p;p=p||{id:uid(),produto:cache.catalogo[0]?.id,meta:"",destino:"estoque",dias:{},obs:"",sem:SEM};
+  const opts=cache.catalogo.map(c=>`<option value="${c.id}" ${c.id===p.produto?"selected":""}>${esc(c.nome)}</option>`).join("");
+  const diasInputs=DIAS.map(d=>{const v=Number((p.dias||{})[d.k]||0);return `<div class="d ${v?"on":""}"><span>${d.n}</span><input type="number" inputmode="numeric" min="0" data-dia="${d.k}" value="${v||""}" placeholder="0"></div>`;}).join("");
+  openModal(isNew?"Novo item do plano":"Editar item",`
+    <div class="form-grid">
+      <div class="field" style="grid-column:1/-1"><label>Produto</label><select id="f_prod">${opts}</select></div>
+      <div class="field"><label>Meta da semana</label><input id="f_meta" type="number" inputmode="numeric" value="${esc(p.meta)}" placeholder="0">
+        <div id="f_metahint" style="font-size:11.5px;color:var(--ink-3);display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-height:18px"></div></div>
+      <div class="field"><label>Produção destinada a</label><select id="f_dest"><option value="estoque" ${p.destino!=="venda"?"selected":""}>Estoque (MTS)</option><option value="venda" ${p.destino==="venda"?"selected":""}>Venda / pedido</option></select></div>
+    </div>
+    <div class="field" style="margin-top:14px"><label>Dias que serão produzidos e quantidade em cada dia</label>
+      <div class="diasgrid" id="f_dias">${diasInputs}</div>
+      <div id="f_batches" style="font-size:11.5px;color:var(--ink-3);margin-top:8px;line-height:1.5"></div></div>
+    <div class="field" style="margin-top:12px"><label>Observação</label><input id="f_obs" value="${esc(p.obs||"")}" placeholder="opcional"></div>
+  `,()=>{
+    const pid=$("#f_prod").value;
+    const dias={};$("#f_dias").querySelectorAll("input[data-dia]").forEach(i=>{const v=Number(i.value||0);if(v>0)dias[i.dataset.dia]=v;});
+    const meta=Number($("#f_meta").value||0);
+    if(!meta){toast("Informe a meta da semana.");return false;}
+    if(!Object.keys(dias).length){toast("Informe ao menos um dia com quantidade.");return false;}
+    // upsert por produto: evita duplicar quando o produto já tem item no plano (ex.: veio da venda média)
+    const existing=cache.plano.find(x=>x.produto===pid&&x.id!==p.id);
+    const targetId=existing?existing.id:p.id;
+    put("plano",targetId,{id:targetId,produto:pid,meta,destino:$("#f_dest").value,dias,obs:$("#f_obs").value.trim(),sem:SEM});
+  });
+  // sugestão de batidas de massa (lotes padrão) por dia, a partir da quantidade de cada dia
+  const fbatch=$("#f_batches");
+  function refreshBatches(){
+    if(!fbatch)return;
+    const pid=$("#f_prod").value;
+    const temLotes=((cfgOf(pid)||{}).loteMassas||[]).some(x=>Number(x.qtd||0)>0);
+    if(!temLotes){fbatch.innerHTML=`<span style="opacity:.75">Sem lotes padrão de massa cadastrados para este produto (configure em Métricas).</span>`;return;}
+    const linhas=[];let totalBat=0;
+    DIAS.forEach(d=>{
+      const q=Number(($("#f_dias").querySelector(`input[data-dia="${d.k}"]`)||{}).value||0);
+      if(q<=0)return;
+      const res=sugerirBatches(pid,q);
+      if(!res)return;
+      totalBat+=res.itens.reduce((s,i)=>s+i.n,0);
+      const extra=res.total!==q?` <span style="color:var(--warn,#b45309)">(bate ${fmt(res.total)} p/ meta ${fmt(q)})</span>`:"";
+      linhas.push(`<div><b>${d.n}:</b> ${fmtBatches(res)}${extra}</div>`);
+    });
+    fbatch.innerHTML=linhas.length
+      ? `<div style="font-weight:600;color:var(--ink-2);margin-bottom:2px">🥖 Batidas de massa sugeridas (${totalBat} batida${totalBat!==1?"s":""} na semana)</div>`+linhas.join("")
+      : `<span style="opacity:.75">Informe a quantidade de cada dia para ver as batidas sugeridas.</span>`;
+  }
+  // realce dos dias marcados
+  $("#f_dias").addEventListener("input",e=>{const d=e.target.closest(".d");if(d)d.classList.toggle("on",Number(e.target.value||0)>0);refreshBatches();});
+  // sugestão de meta a partir da venda média (referência), descontando o que já está programado
+  const fmeta=$("#f_meta"),fhint=$("#f_metahint"),fprod=$("#f_prod");
+  function refreshHint(preencher){const pid=fprod.value,vms=vmsDe(pid);
+    const jaProg=cache.plano.filter(x=>x.produto===pid&&x.id!==p.id).reduce((s,x)=>s+somaDias(x.dias),0);
+    const sug=Math.max(0,vms-jaProg);
+    if(vms>0){
+      fhint.innerHTML=(jaProg>0
+        ? `Venda média ${fmt(vms)} · já programado ${fmt(jaProg)} · <b>faltam ${fmt(sug)}</b> `
+        : `Venda média (sugestão): <b>${fmt(vms)}</b> `)+`<button type="button" class="btn sm ghost" id="f_usesug" style="padding:2px 8px">usar</button>`;
+      const b=fhint.querySelector("#f_usesug");if(b)b.onclick=()=>{fmeta.value=(sug||vms);};
+      if(preencher&&!Number(fmeta.value||0))fmeta.value=(sug||vms);
+    } else { fhint.textContent="Sem venda média cadastrada — informe a meta manualmente."; }
+  }
+  fprod.addEventListener("change",()=>{refreshHint(true);refreshBatches();});
+  refreshHint(isNew);
+  refreshBatches();
+}
+
+/* =========================================================
+   APONTAMENTO  (rota-regra por produto)
+   ========================================================= */
+function viewApont(){
+  const w=el("div");
+  const st=el("div","sec-title");
+  st.innerHTML=`<div><h2>Apontamento de etapas</h2><p>Desdobrado por área de processo a partir da programação e dos pedidos. Registre início, produção e perdas.</p></div>`;
+  const add=el("button","btn primary right");add.innerHTML="+ Iniciar etapa avulsa";add.onclick=()=>modalApont();st.appendChild(add);w.appendChild(st);
+  // Desdobramento por processo — só aparece quando há PROGRAMAÇÃO (distribuída na semana) ou PEDIDO
+  if(tarefasEstoque("semana").length || tarefasPedido().length){
+    const hd=el("div");hd.style.margin="2px 0 12px";
+    hd.innerHTML=`<div class="eyebrow">Desdobramento da semana</div><div class="muted" style="font-size:12.5px;margin-top:2px">Fase estoque (massa → modelagem → ultracongelamento) vem da programação distribuída por dia; fase sob pedido (fermentação → assamento → embalagem → separação) vem dos pedidos abertos.</div>`;
+    w.appendChild(hd);
+    w.appendChild(viewProcesso("semana"));
+  } else {
+    const info=el("div","card");info.appendChild(el("div","empty","Nenhum apontamento a fazer. Eles aparecem quando você programa a produção (aba Programação de Produção, distribuindo as quantidades pelos dias) ou quando entra um pedido de cliente."));
+    w.appendChild(info);
+  }
+  const and=emAndamento();
+  if(and.length){const ca=el("div","card pad0");ca.style.marginBottom="16px";ca.appendChild(cardH("⏱️","Em andamento — toque para finalizar"));const b=el("div");b.style.padding="0";
+    and.forEach(a=>{const r=el("div","live-row");r.innerHTML=`<div class="stripe" style="background:${a.etapa===GARGALO?'var(--accent)':'var(--forno)'}"></div><span style="font-size:20px">${ETAPA_ICON[a.etapa]||"•"}</span><div class="main"><div><b>${esc(prod(a.produto).nome)}</b> · ${esc(a.etapa)} · lote ${esc(a.lote||"—")}</div><div class="who">${esc(a.colab||"—")} · desde ${horaCurta(a.inicio)} (${durTxt(durMin(a.inicio))})</div></div><button class="btn okb sm">Finalizar ▸</button>`;
+      r.querySelector("button").onclick=()=>modalFinalizar(a);b.appendChild(r);});ca.appendChild(b);w.appendChild(ca);}
+  const card=el("div","card pad0");card.appendChild(cardH("📝","Apontamentos concluídos hoje"));
+  const tw=el("div","tw");const tbl=el("table");
+  tbl.innerHTML=`<thead><tr><th>Etapa</th><th>Produto</th><th>Lote</th><th>Colab.</th><th class="n">Início</th><th class="n">Fim</th><th class="n">Tempo</th><th class="n">Produção</th><th class="n">Perda prod.</th><th class="n">Perda MP</th></tr></thead>`;
+  const tb=el("tbody");
+  const conc=cache.apont.filter(a=>a.status==="concluido").sort((a,b)=>String(b.fim).localeCompare(String(a.fim)));
+  if(!conc.length)tb.innerHTML=`<tr><td colspan="10"><div class="empty">Nada concluído ainda hoje.</div></td></tr>`;
+  conc.forEach(a=>{const P=prod(a.produto);const tr=el("tr");
+    tr.innerHTML=`<td>${ETAPA_ICON[a.etapa]||""} ${esc(a.etapa)}</td><td>${esc(P.nome)}</td><td class="mono">${esc(a.lote||"—")}</td><td>${esc(a.colab||"—")}</td>
+      <td class="n">${horaCurta(a.inicio)}</td><td class="n">${horaCurta(a.fim)}</td><td class="n">${durTxt(durMin(a.inicio,a.fim))}</td>
+      <td class="n">${fmt(a.qtd)} <span class="muted">${esc(a.un||P.un)}</span></td>
+      <td class="n">${a.perdaProd?`<span style="color:var(--crit)">${fmt(a.perdaProd)}</span>`:"0"}</td>
+      <td class="n">${a.perdaMP?`<span style="color:var(--crit)">${fmt(a.perdaMP)}</span>`:"0"}</td>`;tb.appendChild(tr);});
+  tbl.appendChild(tb);tw.appendChild(tbl);card.appendChild(tw);w.appendChild(card);return w;
+}
+function modalApont(prefill){
+  // produtos do plano primeiro, depois o resto
+  const noPlano=cache.plano.map(p=>p.produto);
+  const ordered=[...cache.catalogo].sort((a,b)=>(noPlano.includes(b.id)-noPlano.includes(a.id)));
+  const opts=ordered.map(c=>`<option value="${c.id}">${noPlano.includes(c.id)?"🗓️ ":""}${esc(c.nome)}</option>`).join("");
+  const colOpts=PERFIS.map(p=>`<option value="${p.nome}" ${p.id===perfil?"selected":""}>${esc(p.nome)}</option>`).join("");
+  openModal("Iniciar etapa",`
+    <div class="form-grid">
+      <div class="field" style="grid-column:1/-1"><label>Produto</label><select id="f_prod">${opts}</select></div>
+      <div class="field"><label>Etapa (conforme regra do produto)</label><select id="f_etapa"></select></div>
+      <div class="field"><label>Lote</label><input id="f_lote" placeholder="ex.: L-108"></div>
+      <div class="field"><label>Colaborador</label><select id="f_col">${colOpts}</select></div>
+    </div>
+    <div id="f_co"></div>
+    <p class="muted" style="font-size:12.5px;margin:12px 0 0">O horário de início é registrado agora. A produção e as perdas são lançadas ao finalizar.</p>
+  `,()=>{
+    const data={id:uid(),produto:$("#f_prod").value,etapa:$("#f_etapa").value,lote:$("#f_lote").value.trim(),colab:$("#f_col").value,
+      pedidoId:(prefill&&prefill.pedidoId)||null,diaProg:(prefill&&prefill.diaProg)||null,
+      status:"andamento",inicio:new Date().toISOString(),fim:null,qtd:0,un:prod($("#f_prod").value).un,perdaProd:0,perdaMP:0,dia:hoje,obs:""};
+    if(!data.etapa){toast("Este produto não tem etapas configuradas.");return false;}
+    put("apontamentos",data.id,data);
+  });
+  const fp=$("#f_prod"),fe=$("#f_etapa"),fco=$("#f_co");
+  if(prefill&&prefill.produto)fp.value=prefill.produto;
+  const fill=()=>{const rota=(prefill&&prefill.pedidoId)?ETAPAS_PEDIDO:(prefill&&prefill.diaProg)?ETAPAS_ESTOQUE:rotaDe(fp.value);fe.innerHTML=rota.map(e=>`<option value="${e}">${ETAPA_ICON[e]||""} ${e}</option>`).join("");
+    const co=coDe(fp.value);fco.innerHTML=co.length?`<div class="infobox">🔗 <b>Co-produção:</b> esta massa também gera ${co.map(c=>`${fmt(c.qtd)} ${esc(prod(c.produto).nome)}`).join(", ")}. Aponte-a como um lote próprio quando for produzida.</div>`:"";};
+  fp.onchange=fill;fill();
+  if(prefill&&prefill.etapa)fe.value=prefill.etapa;
+  if(prefill&&prefill.lote){const fl=$("#f_lote");if(fl)fl.value=prefill.lote;}
+}
+function modalFinalizar(a){const P=prod(a.produto);
+  openModal(`Finalizar — ${P.nome} · ${a.etapa}`,`
+    <div class="rowflex" style="margin-bottom:14px"><span class="pill accent">${ETAPA_ICON[a.etapa]||""} ${esc(a.etapa)}</span><span class="pill mut">lote ${esc(a.lote||"—")}</span><span class="muted">iniciado ${horaCurta(a.inicio)}</span></div>
+    <div class="form-grid">
+      <div class="field"><label>Produção realizada (${esc(a.un||P.un)})</label><input id="f_qtd" type="number" inputmode="numeric" placeholder="0"></div>
+      <div class="field"><label>Perda de produto (${esc(a.un||P.un)})</label><input id="f_pp" type="number" inputmode="numeric" value="0"></div>
+      <div class="field"><label>Perda de matéria-prima (kg)</label><input id="f_pm" type="number" inputmode="decimal" value="0"></div>
+    </div>
+    <div class="field" style="margin-top:12px"><label>Observação (motivo da perda, ocorrências)</label><input id="f_obs" placeholder="opcional"></div>
+  `,()=>{patch("apontamentos",a.id,{status:"concluido",fim:new Date().toISOString(),qtd:Number($("#f_qtd").value||0),perdaProd:Number($("#f_pp").value||0),perdaMP:Number($("#f_pm").value||0),obs:$("#f_obs").value.trim()});},"Salvar apontamento");
+}
+function modalConcluirDireto(produto,etapa,opts){opts=opts||{};const P=prod(produto);
+  openModal(`Concluir — ${P.nome} · ${etapa}`,`
+    <div class="form-grid">
+      <div class="field"><label>Produção realizada (${esc(P.un)})</label><input id="f_qtd" type="number" inputmode="numeric" placeholder="0"></div>
+      <div class="field"><label>Perda de produto (${esc(P.un)})</label><input id="f_pp" type="number" inputmode="numeric" value="0"></div>
+      <div class="field"><label>Perda de matéria-prima (kg)</label><input id="f_pm" type="number" inputmode="decimal" value="0"></div>
+    </div>
+    <div class="field" style="margin-top:12px"><label>Observação</label><input id="f_obs" placeholder="opcional"></div>
+  `,()=>{const now=new Date().toISOString();const data={id:uid(),produto,etapa,lote:opts.lote||"",colab:(PERFIS.find(p=>p.id===perfil)||{}).nome||"",pedidoId:opts.pedidoId||null,diaProg:(opts.dia||opts.diaProg||null),status:"concluido",inicio:now,fim:now,qtd:Number($("#f_qtd").value||0),un:P.un,perdaProd:Number($("#f_pp").value||0),perdaMP:Number($("#f_pm").value||0),dia:hoje,obs:$("#f_obs").value.trim()};put("apontamentos",data.id,data);},"Concluir etapa");
+}
+// um toque conclui a etapa e move o cartão: finaliza o apontamento em andamento, ou cria um já concluído.
+function concluirEtapa(produto,etapa,opts){const ap=apontAndamento(produto,etapa,opts);if(ap)modalFinalizar(ap);else modalConcluirDireto(produto,etapa,opts);}
+function modalEditApont(a){const P=prod(a.produto);
+  openModal(`Corrigir apontamento — ${P.nome} · ${a.etapa}`,`
+    <div class="form-grid">
+      <div class="field"><label>Produção (${esc(a.un||P.un)})</label><input id="e_qtd" type="number" inputmode="numeric" value="${esc(a.qtd||0)}"></div>
+      <div class="field"><label>Perda de produto</label><input id="e_pp" type="number" inputmode="numeric" value="${esc(a.perdaProd||0)}"></div>
+      <div class="field"><label>Perda de MP (kg)</label><input id="e_pm" type="number" inputmode="decimal" value="${esc(a.perdaMP||0)}"></div>
+      <div class="field"><label>Lote</label><input id="e_lote" value="${esc(a.lote||'')}"></div>
+      <div class="field"><label>Status</label><select id="e_st"><option value="concluido" ${a.status==='concluido'?'selected':''}>Concluído</option><option value="andamento" ${a.status==='andamento'?'selected':''}>Em andamento</option></select></div>
+    </div>
+    <div class="field" style="margin-top:12px"><label>Observação</label><input id="e_obs" value="${esc(a.obs||'')}"></div>
+  `,()=>{patch("apontamentos",a.id,{qtd:Number($("#e_qtd").value||0),perdaProd:Number($("#e_pp").value||0),perdaMP:Number($("#e_pm").value||0),lote:$("#e_lote").value.trim(),status:$("#e_st").value,obs:$("#e_obs").value.trim()});toast("Apontamento corrigido.");},"Salvar correção");
+}
+
+/* =========================================================
+   PEDIDOS  (visão consolidada + status triplo)
+   ========================================================= */
+const PED_STATUS={aberto:{lbl:"A atender",cls:"warn"},aceito:{lbl:"Em produção",cls:"accent"},entregue:{lbl:"Atendido",cls:"ok"},nao:{lbl:"Não atendido",cls:"crit"}};
+function viewPedidos(){
+  const w=el("div");
+  const st=el("div","sec-title");
+  st.innerHTML=`<div><h2>Pedidos da semana</h2><p>Visão consolidada da fábrica. Produtos personalizados por cliente — a Loja lança, a fábrica aceita.</p></div>`;
+  const add=el("button","btn primary right");add.innerHTML="+ Novo pedido";add.onclick=()=>modalPedido();st.appendChild(add);w.appendChild(st);
+  // tiles consolidados
+  const byS=s=>cache.pedidos.filter(p=>p.status===s);
+  const qS=s=>byS(s).reduce((a,p)=>a+Number(p.qtd||0),0);
+  const tiles=el("div","tiles");tiles.style.marginBottom="16px";
+  tiles.appendChild(tile("🟡 A atender",byS("aberto").length,fmt(qS("aberto"))+" un · aguardando aceite"));
+  tiles.appendChild(tile("🔵 Em produção",byS("aceito").length,fmt(qS("aceito"))+" un · aceitos"));
+  tiles.appendChild(tile("🟢 Atendidos",byS("entregue").length,fmt(qS("entregue"))+" un"));
+  const tn=tile("🔴 Não atendidos",byS("nao").length,fmt(qS("nao"))+" un");tiles.appendChild(tn);
+  w.appendChild(tiles);
+  // filtros
+  const sub=el("div","subnav");
+  const mk=(k,l,n)=>{const c=el("button","chip"+(pedFilter===k?" active":""));c.innerHTML=l+(n!=null?` <span class="cbadge">${n}</span>`:"");c.onclick=()=>{pedFilter=k;renderView();};return c;};
+  sub.appendChild(mk("todos","Todos",cache.pedidos.length));
+  sub.appendChild(mk("aberto","A atender",byS("aberto").length));
+  sub.appendChild(mk("aceito","Em produção",byS("aceito").length));
+  sub.appendChild(mk("entregue","Atendidos",byS("entregue").length));
+  sub.appendChild(mk("nao","Não atendidos",byS("nao").length));
+  w.appendChild(sub);
+  const card=el("div","card pad0");const tw=el("div","tw");const tbl=el("table");
+  tbl.innerHTML=`<thead><tr><th></th><th>Cliente</th><th>Produto</th><th class="n">Qtd</th><th>Personalização</th><th>Canal</th><th>Entrega</th><th>Status</th><th></th></tr></thead>`;
+  const tb=el("tbody");
+  let list=[...cache.pedidos];if(pedFilter!=="todos")list=list.filter(p=>p.status===pedFilter);
+  const rank={aberto:0,aceito:1,nao:2,entregue:3};
+  list.sort((a,b)=>((rank[a.status]??9)-(rank[b.status]??9))||(b.urgente-a.urgente)||String(b.criado).localeCompare(String(a.criado)));
+  if(!list.length)tb.innerHTML=`<tr><td colspan="9"><div class="empty">Nenhum pedido ${pedFilter==="todos"?"registrado":"neste filtro"}.</div></td></tr>`;
+  list.forEach(p=>{const P=prod(p.produto),S=PED_STATUS[p.status]||PED_STATUS.aberto;
+    const tr=el("tr");if(p.status==="entregue")tr.style.opacity=".62";
+    const stripe=p.status==="nao"?"var(--crit)":p.urgente&&p.status==="aberto"?"var(--crit)":p.status==="entregue"?"var(--ok)":p.status==="aceito"?"var(--accent)":"var(--warn)";
+    tr.innerHTML=`<td><div class="stripe" style="height:26px;background:${stripe}"></div></td>
+      <td><b>${esc(p.cliente)}</b></td><td>${esc(P.nome)}</td><td class="n">${fmt(p.qtd)} <span class="muted">${esc(P.un)}</span></td>
+      <td class="muted">${esc(p.spec||"—")}</td><td><span class="pill mut">${esc(p.canal)}</span></td><td>${p.entrega?esc(fmtData(p.entrega)):"—"}</td>
+      <td>${p.urgente&&p.status==="aberto"?'<span class="pill crit">URGENTE</span> ':""}<span class="pill ${S.cls}">${S.lbl}</span></td>
+      <td class="rowflex" style="justify-content:flex-end">
+        ${p.status==="aberto"?`<button class="btn sm okb" data-ac="${p.id}">✓ Aceitar</button><button class="btn sm danger" data-na="${p.id}">✕ Recusar</button>`:""}
+        ${p.status==="aceito"?`<button class="btn sm okb" data-en="${p.id}">✓ Concluir</button><button class="btn sm ghost" data-re="${p.id}">↩︎ Reabrir</button>`:""}
+        ${(p.status==="entregue"||p.status==="nao")?`<button class="btn sm ghost" data-re="${p.id}">↩︎ Reabrir</button>`:""}
+        <button class="btn sm ghost" data-e="${p.id}">✏️</button><button class="btn sm danger" data-d="${p.id}">🗑</button></td>`;
+    const q=s=>tr.querySelector(s);
+    if(q("[data-ac]"))q("[data-ac]").onclick=()=>patch("pedidos",p.id,{status:"aceito"});
+    if(q("[data-en]"))q("[data-en]").onclick=()=>patch("pedidos",p.id,{status:"entregue"});
+    if(q("[data-na]"))q("[data-na]").onclick=()=>confirmar("Recusar / marcar como NÃO atendido o pedido de "+p.cliente+"?",()=>patch("pedidos",p.id,{status:"nao"}),"Não atender");
+    if(q("[data-re]"))q("[data-re]").onclick=()=>patch("pedidos",p.id,{status:"aberto"});
+    q("[data-e]").onclick=()=>modalPedido(p);
+    q("[data-d]").onclick=()=>confirmar("Excluir pedido de "+p.cliente+"?",()=>del("pedidos",p.id),"Excluir");
+    tb.appendChild(tr);});
+  tbl.appendChild(tb);tw.appendChild(tbl);card.appendChild(tw);w.appendChild(card);
+  // Apontamentos dos pedidos em produção — aqui mesmo, sob os pedidos aceitos
+  const emProd=cache.pedidos.filter(p=>p.status==="aceito");
+  if(emProd.length){
+    const pc=el("div","card pad0");pc.style.marginTop="16px";
+    pc.appendChild(cardH("🏭","Apontamentos dos pedidos em produção","<span class='right eyebrow'>fermentação → assamento → embalagem → separação</span>"));
+    const body=el("div");body.style.padding="0";
+    emProd.forEach(pd=>{const P=prod(pd.produto);
+      const head=el("div");head.style.cssText="padding:11px 16px 4px;border-top:1px solid var(--line)";
+      head.innerHTML=`<b>${esc(pd.cliente)}</b> · ${fmt(pd.qtd)} ${esc(P.un)} ${esc(P.nome)}${pd.spec?` <span class="muted">· ${esc(pd.spec)}</span>`:""}${pd.entrega?` <span class="muted">· entrega ${esc(fmtData(pd.entrega))}</span>`:""}`;
+      body.appendChild(head);
+      const row=el("div");row.style.cssText="display:flex;flex-wrap:wrap;gap:8px;padding:6px 16px 14px";
+      ETAPAS_PEDIDO.forEach(et=>{const t={origem:"pedido",refId:pd.id,produto:pd.produto,etapa:et,qtd:Number(pd.qtd||0)};const pr=progressoTarefa(t);
+        const cls=pr.st==="concluido"?"ghost":pr.andamento?"okb":"primary";
+        const lbl=pr.st==="concluido"?"✓ "+fmt(pr.produced):pr.andamento?"finalizar":pr.st==="parcial"?fmt(pr.produced)+"/"+fmt(pr.target):"iniciar";
+        const b=el("button","btn sm "+cls);b.style.margin="0";b.innerHTML=`${ETAPA_ICON[et]||""} ${et} · ${lbl}`;
+        b.onclick=()=>{if(pr.andamento){const ap=cache.apont.find(x=>x.produto===pd.produto&&x.etapa===et&&x.status==="andamento"&&x.pedidoId===pd.id);if(ap)modalFinalizar(ap);}else modalApont({produto:pd.produto,etapa:et,pedidoId:pd.id,lote:pd.cliente});};
+        row.appendChild(b);});
+      body.appendChild(row);});
+    pc.appendChild(body);w.appendChild(pc);
+  }
+  const note=el("p","muted");note.style.cssText="font-size:12.5px;margin-top:12px";
+  note.innerHTML="Fluxo: a Loja lança o pedido (<b>A atender</b>) → a fábrica <b>Aceita</b> (vai para <b>Em produção</b> e abre os apontamentos de fermentação, assamento, embalagem e separação — aqui embaixo e também na aba Apontamento) → ao terminar, <b>Concluir</b> marca como Atendido. <b>Recusar</b> marca como Não atendido.";
+  w.appendChild(note);
+  return w;
+}
+function modalPedido(p){
+  const isNew=!p;p=p||{id:uid(),cliente:"",produto:cache.catalogo[0]?.id,qtd:"",spec:"",canal:"WhatsApp",entrega:"",urgente:false,status:"aberto"};
+  const opts=cache.catalogo.map(c=>`<option value="${c.id}" ${c.id===p.produto?"selected":""}>${esc(c.nome)}</option>`).join("");
+  const canais=["WhatsApp","App","Balcão","Telefone"].map(c=>`<option ${c===p.canal?"selected":""}>${c}</option>`).join("");
+  openModal(isNew?"Novo pedido":"Editar pedido",`
+    <div class="form-grid">
+      <div class="field"><label>Cliente</label><input id="f_cli" value="${esc(p.cliente)}" placeholder="ex.: Callburger"></div>
+      <div class="field"><label>Canal</label><select id="f_canal">${canais}</select></div>
+      <div class="field"><label>Produto</label><select id="f_prod">${opts}</select></div>
+      <div class="field"><label>Quantidade</label><input id="f_qtd" type="number" inputmode="numeric" value="${esc(p.qtd)}"></div>
+      <div class="field"><label>Data de entrega</label><input id="f_entrega" type="date" value="${esc(p.entrega||"")}"></div>
+      <div class="field"><label>Urgência</label><select id="f_urg"><option value="0" ${!p.urgente?"selected":""}>Normal</option><option value="1" ${p.urgente?"selected":""}>Urgente</option></select></div>
+    </div>
+    <div class="field" style="margin-top:12px"><label>Personalização (o que muda para este cliente)</label><input id="f_spec" value="${esc(p.spec||"")}" placeholder="ex.: com gergelim, Ø 10 cm"></div>
+  `,()=>{const cli=$("#f_cli").value.trim();if(!cli){toast("Informe o cliente.");return false;}
+    put("pedidos",p.id,{id:p.id,cliente:cli,produto:$("#f_prod").value,qtd:Number($("#f_qtd").value||0),spec:$("#f_spec").value.trim(),canal:$("#f_canal").value,entrega:$("#f_entrega").value,urgente:$("#f_urg").value==="1",status:p.status||"aberto",criado:p.criado||new Date().toISOString()});});
+}
+
+/* =========================================================
+   MÉTRICAS  (+ configuração de regras, só Guilherme)
+   ========================================================= */
+function viewDemanda(){
+  const w=el("div");
+  const st=el("div","sec-title");
+  st.innerHTML=`<div><h2>Vendas médias semanais</h2><p>Ajuste manualmente a média de vendas de cada produto. É a base da meta de produção da semana.</p></div>`;
+  w.appendChild(st);
+  const card=el("div","card pad0");const tw=el("div","tw");const tbl=el("table");
+  tbl.innerHTML=`<thead><tr><th>Cód.</th><th>Produto</th><th>Categoria</th><th class="n" style="width:170px">Venda média semanal</th></tr></thead>`;
+  const tb=el("tbody");
+  const cat=[...cache.catalogo].sort((a,b)=>(a.cod||999)-(b.cod||999));
+  let tot=0;
+  cat.forEach(P=>{const v=vmsDe(P.id);tot+=v;
+    const tr=el("tr");
+    tr.innerHTML=`<td class="mono muted">${P.cod||""}</td><td><b>${esc(P.nome)}</b></td><td>${catPill(P.cat)}</td>
+      <td class="n"><input type="number" inputmode="numeric" min="0" value="${v||""}" placeholder="0" data-p="${P.id}" style="width:110px;text-align:right;font-family:var(--fs-mono);font-variant-numeric:tabular-nums;padding:7px 9px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface);color:var(--ink)"> <span class="muted">${esc(P.un)}</span></td>`;
+    const inp=tr.querySelector("input");
+    inp.onchange=()=>{const nv=Number(inp.value||0);patch("catalogo",P.id,{vms:nv});toast(P.nome+": "+fmt(nv)+" "+P.un+"/sem");};
+    tb.appendChild(tr);});
+  const trt=el("tr");trt.innerHTML=`<td colspan="3" style="text-align:right;font-weight:700">Total semanal</td><td class="n" style="font-weight:700">${fmt(tot)}</td>`;tb.appendChild(trt);
+  tbl.appendChild(tb);tw.appendChild(tbl);card.appendChild(tw);w.appendChild(card);
+  const note=el("p","muted");note.style.cssText="font-size:12.5px;margin-top:12px";
+  note.innerHTML="Estes números são a <b>referência de demanda</b>. Ao programar a semana (“+ Item do plano”), a meta já vem <b>sugerida</b> a partir daqui — cheia quando não há nada programado, ou o restante para completar a média quando já há. Futuro: o motor de MRP somará estoque de segurança e lote econômico a esta média.";
+  w.appendChild(note);
+  return w;
+}
+function viewHistorico(){
+  const w=el("div");
+  const st=el("div","sec-title");
+  st.innerHTML=`<div><h2>Histórico de apontamentos</h2><p>Todos os apontamentos registrados — para consulta e análise futura.</p></div>`;
+  w.appendChild(st);
+  const bar=el("div","rowflex");bar.style.marginBottom="12px";
+  const sty="font-family:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--line-strong);border-radius:9px;background:var(--surface);color:var(--ink)";
+  const selP=el("select");selP.style.cssText=sty;
+  selP.innerHTML=`<option value="">Todos os produtos</option>`+[...cache.catalogo].sort((a,b)=>(a.cod||999)-(b.cod||999)).map(c=>`<option value="${c.id}" ${histProd===c.id?"selected":""}>${esc(c.nome)}</option>`).join("");
+  selP.onchange=()=>{histProd=selP.value;renderView();};
+  const selE=el("select");selE.style.cssText=sty;
+  selE.innerHTML=`<option value="">Todas as etapas</option>`+ETAPAS.map(e=>`<option value="${e}" ${histEtapa===e?"selected":""}>${e}</option>`).join("");
+  selE.onchange=()=>{histEtapa=selE.value;renderView();};
+  bar.appendChild(selP);bar.appendChild(selE);
+  if(histProd||histEtapa){const clr=el("button","btn sm ghost");clr.textContent="Limpar filtros";clr.onclick=()=>{histProd="";histEtapa="";renderView();};bar.appendChild(clr);}
+  w.appendChild(bar);
+  let list=cache.apont.filter(a=>(!histProd||a.produto===histProd)&&(!histEtapa||a.etapa===histEtapa));
+  list=list.slice().sort((a,b)=>String(b.inicio||"").localeCompare(String(a.inicio||"")));
+  const card=el("div","card pad0");const tw=el("div","tw");const tbl=el("table");
+  tbl.innerHTML=`<thead><tr><th>Data</th><th>Dia prog.</th><th>Produto</th><th>Etapa</th><th>Lote / Pedido</th><th>Colab.</th><th class="n">Início</th><th class="n">Fim</th><th class="n">Tempo</th><th class="n">Produção</th><th class="n">Perda prod.</th><th class="n">Perda MP</th><th>Status</th><th></th></tr></thead>`;
+  const tb=el("tbody");
+  if(!list.length)tb.innerHTML=`<tr><td colspan="14"><div class="empty">Nenhum apontamento ${(histProd||histEtapa)?"neste filtro":"registrado ainda"}.</div></td></tr>`;
+  list.forEach(a=>{const P=prod(a.produto);const diaN=(DIAS.find(d=>d.k===a.diaProg)||{}).n||"—";
+    const ped=a.pedidoId?((cache.pedidos.find(x=>x.id===a.pedidoId)||{}).cliente||"pedido"):"";
+    const tr=el("tr");
+    tr.innerHTML=`<td class="mono">${esc(a.dia||"—")}</td><td>${esc(diaN)}</td><td><b>${esc(P.nome)}</b></td>
+      <td>${ETAPA_ICON[a.etapa]||""} ${esc(a.etapa)}</td><td class="mono">${esc(a.lote||ped||"—")}</td><td>${esc(a.colab||"—")}</td>
+      <td class="n">${horaCurta(a.inicio)}</td><td class="n">${horaCurta(a.fim)}</td><td class="n">${durTxt(durMin(a.inicio,a.fim))}</td>
+      <td class="n">${fmt(a.qtd)}</td><td class="n">${a.perdaProd?`<span style="color:var(--crit)">${fmt(a.perdaProd)}</span>`:"0"}</td>
+      <td class="n">${a.perdaMP?`<span style="color:var(--crit)">${fmt(a.perdaMP)}</span>`:"0"}</td>
+      <td>${a.status==="concluido"?'<span class="pill ok">Concluído</span>':'<span class="pill warn">Andamento</span>'}</td>
+      <td class="rowflex" style="justify-content:flex-end"><button class="btn sm ghost" data-e="${a.id}">✏️</button><button class="btn sm danger" data-d="${a.id}">🗑</button></td>`;
+    tr.querySelector("[data-e]").onclick=()=>modalEditApont(a);
+    tr.querySelector("[data-d]").onclick=()=>confirmar("Excluir este apontamento ("+P.nome+" · "+a.etapa+", "+fmt(a.qtd)+" "+(a.un||P.un)+")?",()=>del("apontamentos",a.id),"Excluir");
+    tb.appendChild(tr);});
+  tbl.appendChild(tb);tw.appendChild(tbl);card.appendChild(tw);w.appendChild(card);
+  const cnt=el("p","muted");cnt.style.cssText="font-size:12.5px;margin-top:10px";cnt.textContent=list.length+" apontamento(s). Use ✏️ para corrigir a quantidade/perdas ou 🗑 para excluir um lançamento errado. O histórico fica salvo no banco em nuvem entre sessões (é limpo só ao usar “Reiniciar base”).";
+  w.appendChild(cnt);
+  return w;
+}
+function viewMetricas(){
+  const w=el("div");
+  const st=el("div","sec-title");st.innerHTML=`<div><h2>Métricas por etapa</h2><p>De onde vem o desperdício de tempo e de recursos. Base para melhoria contínua.</p></div>`;w.appendChild(st);
+  // Painel de configuração (só Guilherme)
+  if(isGui()) w.appendChild(cfgPanel());
+  const M=metricasEtapa();
+  const perdaTotP=M.reduce((s,m)=>s+m.perdaP,0),perdaTotM=M.reduce((s,m)=>s+m.perdaM,0);
+  const tempoGarg=cache.apont.filter(a=>a.etapa===GARGALO&&a.status==="concluido").reduce((s,a)=>s+(durMin(a.inicio,a.fim)||0),0);
+  const tiles=el("div","tiles");tiles.style.margin="16px 0";
+  tiles.appendChild(tile("📉 Perda de produto (dia)",fmt(perdaTotP),"unidades perdidas"));
+  tiles.appendChild(tile("🌾 Perda de MP (dia)",fmt(perdaTotM),"kg de matéria-prima"));
+  const gt=tile("❄️ Ocupação do gargalo",durTxt(tempoGarg),"tempo em ultracongelamento hoje");gt.classList.add("accent-t");tiles.appendChild(gt);
+  tiles.appendChild(tile("📝 Apontamentos",cache.apont.length,"registros no período"));
+  w.appendChild(tiles);
+  // Tempo padrão × realizado (por produto e etapa)
+  const cmp=el("div","card pad0");cmp.style.marginBottom="16px";
+  cmp.appendChild(cardH("⏱️","Tempo padrão × realizado","<span class='right eyebrow'>desperdício de tempo</span>"));
+  const ctw=el("div","tw");const ctbl=el("table");
+  ctbl.innerHTML=`<thead><tr><th>Produto</th><th>Etapa</th><th class="n">Padrão</th><th class="n">Realizado (méd.)</th><th class="n">Desvio</th></tr></thead>`;
+  const ctb=el("tbody");let anyCmp=false;
+  cache.catalogo.forEach(P=>{
+    const rota=rotaDe(P.id),tp=temposDe(P.id);
+    const linhas=rota.filter(e=>tp[e]||realizadoMedioEtapa(P.id,e)!=null);
+    linhas.forEach((e,i)=>{anyCmp=true;const pad=tp[e]||null,real=realizadoMedioEtapa(P.id,e);
+      let desvio="—",cor="var(--ink-3)";
+      if(pad!=null&&real!=null){const d=real-pad;
+        desvio=(d>0?"+":d<0?"−":"")+durTxt(Math.abs(d));cor=d>pad*0.1?"var(--crit)":d<-pad*0.1?"var(--ok)":"var(--ink-2)";}
+      const tr=el("tr");
+      tr.innerHTML=`<td>${i===0?`<b>${esc(P.nome)}</b>`:'<span class="muted">›</span>'}</td>
+        <td>${ETAPA_ICON[e]||""} ${esc(e)}${e===GARGALO?' <span class="pill accent" style="margin-left:2px">gargalo</span>':""}</td>
+        <td class="n">${pad!=null?durTxt(pad):'<span class="muted">—</span>'}</td>
+        <td class="n">${real!=null?durTxt(real):'<span class="muted">—</span>'}</td>
+        <td class="n" style="color:${cor};font-weight:600">${desvio}</td>`;
+      ctb.appendChild(tr);});
+  });
+  if(!anyCmp)ctb.innerHTML=`<tr><td colspan="5"><div class="empty">Defina os tempos padrão na configuração (perfil Guilherme) para comparar com o realizado.</div></td></tr>`;
+  ctbl.appendChild(ctb);ctw.appendChild(ctbl);cmp.appendChild(ctw);
+  const cnote=el("div");cnote.style.cssText="padding:10px 16px;border-top:1px solid var(--line);font-size:12px;color:var(--ink-3)";
+  cnote.innerHTML="Desvio positivo (vermelho) = etapa levou <b>mais</b> tempo que o padrão. Negativo (verde) = mais rápida. Base para atacar o desperdício de tempo — com atenção redobrada ao gargalo.";
+  cmp.appendChild(cnote);
+  w.appendChild(cmp);
+  const card=el("div","card pad0");card.appendChild(cardH("📊","Desempenho por etapa"));
+  const tw=el("div","tw");const tbl=el("table");
+  tbl.innerHTML=`<thead><tr><th>Etapa</th><th class="n">Apont.</th><th class="n">Tempo médio</th><th class="n">Produção</th><th class="n">Perda prod.</th><th class="n">Perda MP</th><th class="n">% perda</th><th style="width:120px">Perda</th></tr></thead>`;
+  const tb=el("tbody");const maxP=Math.max(1,...M.map(m=>m.pct));
+  M.forEach(m=>{const isG=m.etapa===GARGALO;const pw=Math.round(m.pct/maxP*100);const tr=el("tr");
+    tr.innerHTML=`<td>${ETAPA_ICON[m.etapa]||""} <b>${esc(m.etapa)}</b> ${isG?'<span class="pill accent" style="margin-left:4px">gargalo</span>':""}</td>
+      <td class="n">${m.n}${m.andamento?` <span class="muted">(+${m.andamento})</span>`:""}</td><td class="n">${m.tMed!=null?durTxt(m.tMed):"—"}</td>
+      <td class="n">${fmt(m.prodTot)}</td><td class="n">${m.perdaP?`<span style="color:var(--crit)">${fmt(m.perdaP)}</span>`:"0"}</td>
+      <td class="n">${m.perdaM?`<span style="color:var(--crit)">${fmt(m.perdaM)}</span>`:"0"}</td><td class="n">${m.pct?m.pct.toFixed(1)+"%":"0%"}</td>
+      <td><div class="bar"><i class="part" style="width:${pw}%;background:${m.pct>5?'var(--crit)':'var(--forno)'}"></i></div></td>`;tb.appendChild(tr);});
+  tbl.appendChild(tb);tw.appendChild(tbl);card.appendChild(tw);w.appendChild(card);
+  return w;
+}
+function cfgPanel(){
+  const card=el("div","card");card.style.borderColor="color-mix(in srgb,var(--accent) 40%,var(--line))";
+  const add=el("button","btn primary sm right");add.innerHTML="+ Novo produto";add.onclick=()=>modalProduto();
+  const rst=el("button","btn sm danger");rst.innerHTML="🧹 Reiniciar base";rst.title="Limpa tudo e recarrega o catálogo e as quantidades semanais padrão";rst.onclick=resetBase;
+  const h=cardH("⚙️","Configuração de produtos, etapas e regras","<span class='pill accent' style='margin-left:auto'>só Guilherme</span>");
+  h.appendChild(add);h.appendChild(rst);
+  card.appendChild(h);
+  const b=el("div","card-b");
+  const intro=el("p","muted");intro.style.margin="0 0 12px";
+  intro.innerHTML="Cadastre produtos e defina, para cada um, a <b>rota de etapas</b> (a regra), o <b>tempo padrão</b> de cada etapa, as <b>co-produções</b> e as <b>restrições</b>. O Apontamento passa a oferecer só as etapas configuradas; as Métricas comparam o tempo padrão com o realizado.";
+  b.appendChild(intro);
+  const rowSel=el("div","rowflex");
+  const sel=el("select");sel.style.cssText="max-width:280px;font-family:inherit;font-size:14px;padding:9px 11px;border:1px solid var(--line-strong);border-radius:9px;background:var(--surface);color:var(--ink)";
+  sel.innerHTML=`<option value="">— escolha um produto para configurar —</option>`+cache.catalogo.map(c=>`<option value="${c.id}" ${cfgProd===c.id?"selected":""}>${esc(c.nome)}</option>`).join("");
+  sel.onchange=()=>{cfgProd=sel.value;renderView();};
+  rowSel.appendChild(sel);
+  if(cfgProd){
+    const ed=el("button","btn sm ghost");ed.innerHTML="✏️ Editar dados";ed.onclick=()=>modalProduto(prod(cfgProd));
+    const rm=el("button","btn sm danger");rm.innerHTML="🗑 Excluir produto";rm.onclick=()=>confirmar("Excluir o produto "+prod(cfgProd).nome+"? Ele sai do catálogo, do plano e da configuração.",()=>excluirProduto(cfgProd),"Excluir produto");
+    rowSel.appendChild(ed);rowSel.appendChild(rm);
+  }
+  b.appendChild(rowSel);
+  if(cfgProd){b.appendChild(cfgEditor(cfgProd));}
+  card.appendChild(b);return card;
+}
+function excluirProduto(pid){
+  del("catalogo",pid);if(cfgOf(pid))del("config",pid);
+  cache.plano.filter(p=>p.produto===pid).forEach(p=>del("plano",p.id));
+  cfgProd=null;renderView();
+}
+function modalProduto(p){
+  const isNew=!p;p=p||{id:null,nome:"",linha:"",cat:"cru",un:"un"};
+  const catOpts=Object.entries(CATS).map(([k,v])=>`<option value="${k}" ${k===p.cat?"selected":""}>${esc(v.lbl)}</option>`).join("");
+  openModal(isNew?"Novo produto":"Editar produto",`
+    <div class="form-grid">
+      <div class="field" style="grid-column:1/-1"><label>Nome do produto</label><input id="f_nome" value="${esc(p.nome)}" placeholder="ex.: Pão Multigrãos Forma"></div>
+      <div class="field"><label>Linha</label><input id="f_linha" value="${esc(p.linha||"")}" placeholder="ex.: Rústicos"></div>
+      <div class="field"><label>Unidade</label><select id="f_un"><option ${p.un==="un"?"selected":""}>un</option><option ${p.un==="kg"?"selected":""}>kg</option><option ${p.un==="cx"?"selected":""}>cx</option><option ${p.un==="pct"?"selected":""}>pct</option></select></div>
+      <div class="field" style="grid-column:1/-1"><label>Categoria</label><select id="f_cat">${catOpts}</select></div>
+    </div>
+    ${isNew?'<p class="muted" style="font-size:12.5px;margin:12px 0 0">A rota de etapas começa com um padrão da categoria — você ajusta em seguida.</p>':""}
+  `,()=>{
+    const nome=$("#f_nome").value.trim();if(!nome){toast("Informe o nome do produto.");return false;}
+    const cat=$("#f_cat").value,un=$("#f_un").value,linha=$("#f_linha").value.trim();
+    if(isNew){const id=slugUnico(nome);const rota=rotaPadraoCat(cat);
+      put("catalogo",id,{id,nome,linha,cat,un,rota});
+      put("config",id,{id,rota,tempos:{},co:[],regras:""});
+      cfgProd=id;
+    } else {
+      put("catalogo",p.id,{...prod(p.id),id:p.id,nome,linha,cat,un});
+    }
+  });
+}
+function cfgEditor(pid){
+  const P=prod(pid);const c=cfgOf(pid)||{id:pid,rota:P.rota||[],tempos:{},co:[],regras:""};
+  let rota=[...(c.rota||[])];let co=(c.co||[]).map(x=>({...x}));let tempos={...(c.tempos||{})};
+  let pesoCorte=c.pesoCorte||"";let loteMassas=(c.loteMassas||[]).map(x=>({...x}));
+  const wrap=el("div");wrap.style.cssText="border-top:1px solid var(--line);padding-top:14px;margin-top:14px";
+  // rota
+  wrap.appendChild(el("div","eyebrow","Rota de etapas (na ordem do processo)"));
+  const rotaBox=el("div","cfg-rota");rotaBox.style.margin="8px 0 16px";
+  ETAPAS.forEach(e=>{const on=rota.includes(e);const t=el("button","cfg-et"+(on?" on":""));t.type="button";
+    t.innerHTML=`${ETAPA_ICON[e]||""} ${e} ${on?"✓":""}`;t.onclick=()=>{if(rota.includes(e))rota=rota.filter(x=>x!==e);else rota.push(e);
+      rota=ETAPAS.filter(x=>rota.includes(x));drawRota();drawTempos();};rotaBox.appendChild(t);});
+  wrap.appendChild(rotaBox);
+  function drawRota(){[...rotaBox.children].forEach((btn,i)=>{const e=ETAPAS[i];const on=rota.includes(e);btn.className="cfg-et"+(on?" on":"");btn.innerHTML=`${ETAPA_ICON[e]||""} ${e} ${on?"✓":""}`;});}
+  // tempos padrão
+  wrap.appendChild(el("div","eyebrow","Tempo padrão de cada etapa (minutos)"));
+  const tempBox=el("div");tempBox.style.margin="8px 0 16px";
+  function drawTempos(){tempBox.innerHTML="";
+    if(!rota.length){tempBox.innerHTML='<span class="muted" style="font-size:13px">Selecione as etapas acima para definir os tempos.</span>';return;}
+    const g=el("div","diasgrid");g.style.gridTemplateColumns="repeat(auto-fit,minmax(110px,1fr))";
+    rota.forEach(e=>{const d=el("div","d"+(tempos[e]?" on":""));
+      d.innerHTML=`<span>${ETAPA_ICON[e]||""} ${e}</span><input type="number" inputmode="numeric" min="0" data-et="${e}" value="${tempos[e]||""}" placeholder="min">`;
+      d.querySelector("input").oninput=ev=>{const v=Number(ev.target.value||0);if(v>0)tempos[e]=v;else delete tempos[e];d.classList.toggle("on",v>0);};
+      g.appendChild(d);});
+    tempBox.appendChild(g);}
+  drawTempos();wrap.appendChild(tempBox);
+  // co-produção
+  wrap.appendChild(el("div","eyebrow","Co-produções (mesma massa gera outro produto)"));
+  const coBox=el("div");coBox.style.margin="8px 0 6px";
+  function drawCo(){coBox.innerHTML="";co.forEach((row,idx)=>{
+    const opts=cache.catalogo.filter(x=>x.id!==pid).map(x=>`<option value="${x.id}" ${x.id===row.produto?"selected":""}>${esc(x.nome)}</option>`).join("");
+    const r=el("div","co-row");
+    r.innerHTML=`<div class="field"><label>Produto</label><select data-i="${idx}" data-f="produto">${opts}</select></div>
+      <div class="field"><label>Qtd</label><input type="number" data-i="${idx}" data-f="qtd" value="${esc(row.qtd||"")}"></div>
+      <div class="field"><label>Observação</label><input data-i="${idx}" data-f="obs" value="${esc(row.obs||"")}"></div>
+      <button class="btn sm danger" data-rm="${idx}" type="button">✕</button>`;
+    r.querySelectorAll("[data-f]").forEach(inp=>inp.onchange=()=>{co[idx][inp.dataset.f]=inp.dataset.f==="qtd"?Number(inp.value||0):inp.value;});
+    r.querySelector("[data-rm]").onclick=()=>{co.splice(idx,1);drawCo();};coBox.appendChild(r);});}
+  drawCo();wrap.appendChild(coBox);
+  const addCo=el("button","btn sm ghost");addCo.type="button";addCo.textContent="+ Co-produção";addCo.onclick=()=>{co.push({produto:cache.catalogo.find(x=>x.id!==pid)?.id,qtd:"",obs:""});drawCo();};
+  wrap.appendChild(addCo);
+  // lotes padrão de massa (batimento por masseira)
+  wrap.appendChild(el("div","eyebrow","Lotes padrão de massa (batimento)"));
+  const fpc=el("div","field");fpc.style.cssText="max-width:220px;margin:8px 0 10px";
+  fpc.innerHTML=`<label>Peso de corte da massa crua (g por unidade)</label><input id="cfg_peso" type="number" inputmode="numeric" min="0" value="${esc(pesoCorte)}" placeholder="ex.: 70">`;
+  fpc.querySelector("input").oninput=e=>{pesoCorte=Number(e.target.value||0);drawLotes();};
+  wrap.appendChild(fpc);
+  const lmBox=el("div");lmBox.style.margin="2px 0 6px";
+  function drawLotes(){lmBox.innerHTML="";
+    if(!loteMassas.length){lmBox.innerHTML='<span class="muted" style="font-size:13px">Nenhum lote padrão. Ex.: M2 40kg → 400 un; M1 15kg → 200 un.</span>';return;}
+    loteMassas.forEach((row,idx)=>{
+      const opts=MASSEIRAS.map(m=>`<option value="${esc(m)}" ${m===row.masseira?"selected":""}>${esc(m)}</option>`).join("");
+      const q=Number(row.qtd||0),pc=Number(pesoCorte||0);const kg=q&&pc?(q*pc/1000):0;const cap=capMasseira(row.masseira);
+      const flag=kg&&cap&&kg>cap?` <span class="pill crit" title="Acima da capacidade da masseira">estoura ${cap}kg</span>`:(kg?` <span class="pill mut">${kg.toLocaleString("pt-BR",{maximumFractionDigits:1})} kg</span>`:"");
+      const r=el("div","co-row");r.style.gridTemplateColumns="1.2fr .8fr 1.4fr auto";
+      r.innerHTML=`<div class="field"><label>Masseira</label><select data-i="${idx}" data-f="masseira">${opts}</select></div>
+        <div class="field"><label>Qtd (un)</label><input type="number" inputmode="numeric" data-i="${idx}" data-f="qtd" value="${esc(row.qtd||"")}"></div>
+        <div class="field"><label>Massa / obs.</label><div class="rowflex" style="gap:6px"><span class="lm-kg">${flag}</span><input data-i="${idx}" data-f="obs" value="${esc(row.obs||"")}" placeholder="opcional" style="flex:1"></div></div>
+        <button class="btn sm danger" data-rm="${idx}" type="button">✕</button>`;
+      r.querySelectorAll("[data-f]").forEach(inp=>inp.onchange=()=>{loteMassas[idx][inp.dataset.f]=inp.dataset.f==="qtd"?Number(inp.value||0):inp.value;drawLotes();});
+      r.querySelector("[data-rm]").onclick=()=>{loteMassas.splice(idx,1);drawLotes();};lmBox.appendChild(r);});}
+  drawLotes();wrap.appendChild(lmBox);
+  const addLm=el("button","btn sm ghost");addLm.type="button";addLm.textContent="+ Lote padrão";addLm.style.marginBottom="4px";
+  addLm.onclick=()=>{loteMassas.push({masseira:MASSEIRAS[1],qtd:"",obs:""});drawLotes();};
+  wrap.appendChild(addLm);
+  // regras
+  const fr=el("div","field");fr.style.marginTop="16px";fr.innerHTML=`<label>Restrições e regras (texto livre)</label><textarea id="cfg_regras" placeholder="ex.: 2 produções semanais; nesta produção sai também o Petrópolis...">${esc(c.regras||"")}</textarea>`;
+  wrap.appendChild(fr);
+  const save=el("button","btn primary");save.style.marginTop="14px";save.textContent="Salvar regra do produto";
+  save.onclick=()=>{const tp={};rota.forEach(e=>{if(tempos[e])tp[e]=tempos[e];});
+    const data={id:pid,rota,tempos:tp,co:co.filter(x=>x.produto&&x.qtd),pesoCorte:Number(pesoCorte||0),loteMassas:loteMassas.filter(x=>x.masseira&&x.qtd),regras:$("#cfg_regras").value.trim()};put("config",pid,data);
+    save.textContent="✓ Salvo";setTimeout(()=>{save.textContent="Salvar regra do produto";},1500);};
+  wrap.appendChild(save);
+  return wrap;
+}
+
+/* =========================================================
+   TV / Modal / Boot
+   ========================================================= */
+function enterTV(which){tvView=which||"kprod";document.body.classList.add("tv");$("#tvExit").style.display="inline-flex";renderTV();try{if(document.documentElement.requestFullscreen)document.documentElement.requestFullscreen();}catch(e){}}
+function exitTV(){document.body.classList.remove("tv");$("#tvExit").style.display="none";try{if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen();}catch(e){}}
+function renderTV(){const t=$("#tvwrap");t.innerHTML="";t.appendChild(tvView==="kped"?viewKanbanPed(true):viewKanbanProd(true));}
+function openModal(title,bodyHTML,onSave,saveLabel){
+  const host=$("#modalHost");const scrim=el("div","scrim");
+  scrim.innerHTML=`<div class="modal" role="dialog" aria-modal="true"><div class="modal-h"><h3>${esc(title)}</h3><button class="iconbtn right" id="m_x" aria-label="Fechar">✕</button></div><div class="modal-b">${bodyHTML}</div><div class="modal-f"><button class="btn ghost" id="m_cancel">Cancelar</button><button class="btn primary right" id="m_ok">${esc(saveLabel||"Salvar")}</button></div></div>`;
+  const close=()=>host.innerHTML="";host.innerHTML="";host.appendChild(scrim);
+  scrim.querySelector("#m_x").onclick=close;scrim.querySelector("#m_cancel").onclick=close;scrim.onclick=e=>{if(e.target===scrim)close();};
+  scrim.querySelector("#m_ok").onclick=async()=>{let r;try{r=await onSave();}catch(err){toast("Erro: "+(err&&err.message||err));return;}if(r!==false)close();};
+  const f=scrim.querySelector("input,select,textarea");if(f)setTimeout(()=>f.focus(),40);
+}
+function applyTheme(t){if(t)document.documentElement.setAttribute("data-theme",t);saveLS("pcp_theme",t||"");}
+(function(){const t=loadLS("pcp_theme","");if(t)document.documentElement.setAttribute("data-theme",t);})();
+$("#themeBtn").onclick=()=>{const cur=document.documentElement.getAttribute("data-theme");const dark=cur?cur==="dark":matchMedia("(prefers-color-scheme:dark)").matches;applyTheme(dark?"light":"dark");};
+$("#tvExit").onclick=exitTV;
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&document.body.classList.contains("tv"))exitTV();});
+(function(){const bs=$("#brandsub");if(bs)bs.textContent="PCP · Chão de fábrica · "+VER;})();
+function bootApp(){renderPerfil();renderTabs();renderBanner();renderView();initDB();}
+function aplicarPerfilDoLogin(){if(usuarioLogado){const pf=PERFIS.find(p=>p.id===usuarioLogado);if(pf){perfil=usuarioLogado;saveLS("pcp_perfil",perfil);tab=pf.tab;}}}
+function mostrarApp(){const ls=document.getElementById("login-screen");if(ls)ls.style.display="none";aplicarPerfilDoLogin();bootApp();}
+window.entrar=function(){
+  const u=(document.getElementById("l-user").value||"").trim().toLowerCase();
+  const p=document.getElementById("l-pass").value||"";
+  const err=document.getElementById("login-error");err.textContent="";
+  if(!u||!p){err.textContent="Preencha usuário e senha.";return;}
+  if(USUARIOS_VALIDOS.indexOf(u)===-1){err.textContent="Usuário não encontrado.";return;}
+  const btn=document.getElementById("login-btn");btn.disabled=true;btn.textContent="Entrando…";
+  FS.collection("usuarios").doc(u).get().then(doc=>{
+    let hash;
+    if(!doc.exists){hash=hashSimples(u);FS.collection("usuarios").doc(u).set({senhaHash:hash,nome:u,criadoEm:firebase.firestore.FieldValue.serverTimestamp()});}
+    else hash=doc.data().senhaHash;
+    if(hashSimples(p)===hash){usuarioLogado=u;sessionStorage.setItem("pcp_user",u);mostrarApp();}
+    else{err.textContent="Senha incorreta.";btn.disabled=false;btn.textContent="Entrar";}
+  }).catch(e=>{err.textContent="Erro de conexão: "+e.message;btn.disabled=false;btn.textContent="Entrar";});
+};
+window.sairConta=function(){confirmar("Deseja sair da conta?",()=>{sessionStorage.removeItem("pcp_user");location.reload();},"Sair");};
+window.trocarSenha=function(){
+  if(!usuarioLogado){toast("Entre na conta primeiro.");return;}
+  openModal("Trocar senha",`
+    <div class="field"><label>Senha atual</label><input id="ts_atual" type="password"></div>
+    <div class="field" style="margin-top:10px"><label>Nova senha</label><input id="ts_nova" type="password"></div>
+    <div class="field" style="margin-top:10px"><label>Confirmar nova senha</label><input id="ts_conf" type="password"></div>`,
+  async()=>{
+    const a=$("#ts_atual").value,n=$("#ts_nova").value,c=$("#ts_conf").value;
+    if(!a||!n||!c){toast("Preencha todos os campos.");return false;}
+    if(n!==c){toast("Nova senha e confirmação não coincidem.");return false;}
+    if(n.length<3){toast("A senha deve ter ao menos 3 caracteres.");return false;}
+    const doc=await FS.collection("usuarios").doc(usuarioLogado).get();
+    const atualHash=doc.exists?doc.data().senhaHash:hashSimples(usuarioLogado);
+    if(hashSimples(a)!==atualHash){toast("Senha atual incorreta.");return false;}
+    await FS.collection("usuarios").doc(usuarioLogado).update({senhaHash:hashSimples(n)});
+    toast("Senha alterada com sucesso.");
+  });
+};
+(function(){const u=sessionStorage.getItem("pcp_user");if(u&&USUARIOS_VALIDOS.indexOf(u)!==-1){usuarioLogado=u;mostrarApp();}})();
+setInterval(()=>{const txt=new Date().toLocaleString("pt-BR",{weekday:"short",hour:"2-digit",minute:"2-digit"});document.querySelectorAll("#clock").forEach(x=>x.textContent=txt);},30000);
+</script>
+</body>
+</html>

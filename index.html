@@ -259,7 +259,7 @@ const ETAPAS_ESTOQUE=["Masseira","Modelagem","Ultracongelamento"]; // fase seman
 const ETAPAS_PEDIDO=["Fermentação","Assamento","Embalagem","Separação"]; // fase sob pedido
 const ETAPAS=[...ETAPAS_ESTOQUE,...ETAPAS_PEDIDO];
 const GARGALO="Ultracongelamento";
-const VER="v31-web";
+const VER="v32-web";
 const ETAPA_ICON={Masseira:"🌀",Modelagem:"✋",Ultracongelamento:"❄️",Fermentação:"⏳",Assamento:"🔥",Embalagem:"📦",Separação:"🧺"};
 const faseEtapa=et=>ETAPAS_ESTOQUE.includes(et)?"estoque":"pedido";
 const DIAS=[{k:"seg",n:"Seg"},{k:"ter",n:"Ter"},{k:"qua",n:"Qua"},{k:"qui",n:"Qui"},{k:"sex",n:"Sex"},{k:"sab",n:"Sáb"},{k:"dom",n:"Dom"}];
@@ -358,9 +358,27 @@ const CATALOGO_SEED=[
 // Base limpa: vazio — cada produto usa a rota padrão (estoque + pedido) até ser configurado.
 const CONFIG_SEED=[];
 
-function semanaAtual(){const d=new Date();const day=(d.getDay()+6)%7;const mon=new Date(d);mon.setDate(d.getDate()-day);
-  return String(mon.getDate()).padStart(2,"0")+"/"+String(mon.getMonth()+1).padStart(2,"0");}
-const SEM=semanaAtual();
+function mondayOf(d){const x=new Date(d);x.setHours(0,0,0,0);const day=(x.getDay()+6)%7;x.setDate(x.getDate()-day);return x;}
+function semLabelOf(mon){return String(mon.getDate()).padStart(2,"0")+"/"+String(mon.getMonth()+1).padStart(2,"0");}
+function semRangeOf(mon){const fim=new Date(mon);fim.setDate(mon.getDate()+6);return semLabelOf(mon)+" a "+semLabelOf(fim);}
+function semanaAtual(){return semLabelOf(mondayOf(new Date()));}
+// Semana selecionada (navegável). SEM = rótulo (DD/MM da segunda) usado como chave do plano. SEM0 = semana vigente real.
+let semMonday=mondayOf(new Date());
+let SEM=semLabelOf(semMonday);
+const SEM0=semLabelOf(mondayOf(new Date()));
+// itens antigos sem campo "sem" são tratados como da semana vigente
+const planoSem=()=>cache.plano.filter(p=>(p.sem||SEM0)===SEM);
+function irSemana(delta){semMonday=new Date(semMonday);semMonday.setDate(semMonday.getDate()+delta*7);SEM=semLabelOf(semMonday);renderAll();}
+function semHoje(){semMonday=mondayOf(new Date());SEM=semLabelOf(semMonday);renderAll();}
+function weekNav(){
+  const w=el("div","rowflex");w.style.gap="6px";
+  const prev=el("button","btn sm ghost");prev.type="button";prev.textContent="‹";prev.title="Semana anterior";prev.onclick=()=>irSemana(-1);
+  const lab=el("div");lab.style.cssText="font-family:var(--fs-display);font-weight:700;font-size:13px;min-width:168px;text-align:center;white-space:nowrap";
+  lab.innerHTML="Semana "+semRangeOf(semMonday)+(SEM===SEM0?' <span class="pill accent" style="padding:1px 7px">vigente</span>':"");
+  const next=el("button","btn sm ghost");next.type="button";next.textContent="›";next.title="Próxima semana";next.onclick=()=>irSemana(1);
+  const hoje=el("button","btn sm ghost");hoje.type="button";hoje.textContent="Hoje";hoje.onclick=semHoje;if(SEM===SEM0)hoje.style.display="none";
+  w.append(prev,lab,next,hoje);return w;
+}
 const HOJE_K=DIA_JS[new Date().getDay()];
 
 // Plano começa vazio: a venda média (catálogo.vms / q) é referência; a programação é criada aqui.
@@ -391,7 +409,7 @@ const el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=nu
 const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
 const prod=id=>cache.catalogo.find(p=>p.id===id)||{nome:id,un:"un",cat:"cru",rota:ETAPAS};
 const vmsDe=id=>{const P=prod(id);return Number(P.vms!=null?P.vms:(P.q||0));}; // venda média semanal (referência)
-const progSemProd=id=>cache.plano.filter(p=>p.produto===id).reduce((s,p)=>s+somaDias(p.dias),0); // já programado na semana
+const progSemProd=id=>planoSem().filter(p=>p.produto===id).reduce((s,p)=>s+somaDias(p.dias),0); // já programado na semana selecionada
 const cfgOf=id=>cache.config.find(c=>c.id===id);
 const rotaDe=id=>{const c=cfgOf(id);return (c&&c.rota&&c.rota.length)?c.rota:(prod(id).rota||ETAPAS);};
 const coDe=id=>{const c=cfgOf(id);return (c&&c.co)?c.co:[];};
@@ -526,7 +544,7 @@ function progressoTarefa(t){const aps=cache.apont.filter(a=>a.produto===t.produt
   return{st,produced,target,andamento};}
 function statusEtapa(pid,et){const aps=cache.apont.filter(a=>a.produto===pid&&a.etapa===et);if(aps.some(a=>a.status==="andamento"))return"andamento";if(aps.some(a=>a.status==="concluido"))return"concluido";return"afazer";}
 // Fase ESTOQUE (semanal): massa → modelagem → ultracongelamento, a partir das quantidades da semana/dia.
-function tarefasEstoque(scope){const out=[];cache.plano.forEach(p=>{const dias=p.dias||{};
+function tarefasEstoque(scope){const out=[];planoSem().forEach(p=>{const dias=p.dias||{};
   DIAS.forEach(d=>{const q=Number(dias[d.k]||0);if(q<=0)return;if(scope!=="semana"&&scope!==d.k)return;
     ETAPAS_ESTOQUE.forEach(et=>out.push({origem:"plano",refId:p.id,dia:d.k,produto:p.produto,etapa:et,area:areaDaEtapa(et),fase:"estoque",qtd:q,rotulo:null}));});});return out;}
 // Fase PEDIDO: fermentação → assamento → embalagem → separação, a partir dos pedidos abertos.
@@ -585,11 +603,11 @@ function gargaloInfo(){const uso=emAndamento().filter(a=>a.etapa===GARGALO);retu
 function viewPainel(tv){
   const w=el("div");
   const hero=el("div","painel-hero");
-  hero.innerHTML=`<div><div class="eyebrow">Semana ${SEM}</div><h1 class="tvttl" style="font-size:22px;font-weight:800">Painel de Produção</h1></div>
+  hero.innerHTML=`<div><div class="eyebrow">Semana ${semRangeOf(semMonday)}${SEM===SEM0?" · vigente":""}</div><h1 class="tvttl" style="font-size:22px;font-weight:800">Painel de Produção</h1></div>
     <div class="clock" id="clock">${new Date().toLocaleString("pt-BR",{weekday:"short",hour:"2-digit",minute:"2-digit"})}</div>
     <div class="right rowflex">${tv?"":'<button class="btn forno sm" id="tvBtn">📺 Modo TV</button>'}</div>`;
   w.appendChild(hero);if(!tv){const b=hero.querySelector("#tvBtn");if(b)b.onclick=()=>enterTV("prod");}
-  const programados=cache.plano.filter(p=>somaDias(p.dias)>0); // o que está efetivamente programado na semana
+  const programados=planoSem().filter(p=>somaDias(p.dias)>0); // o que está efetivamente programado na semana selecionada
   const totMeta=programados.reduce((s,p)=>s+somaDias(p.dias),0);
   const totReal=programados.reduce((s,p)=>s+realizadoProduto(p.produto),0);
   const g=gargaloInfo();
@@ -624,7 +642,7 @@ function viewPainel(tv){
 function viewPainelPed(tv){
   const w=el("div");
   const hero=el("div","painel-hero");
-  hero.innerHTML=`<div><div class="eyebrow">Semana ${SEM} · Pedidos</div><h1 class="tvttl" style="font-size:22px;font-weight:800">Painel de Pedidos</h1></div>
+  hero.innerHTML=`<div><div class="eyebrow">Pedidos</div><h1 class="tvttl" style="font-size:22px;font-weight:800">Painel de Pedidos</h1></div>
     <div class="clock" id="clock">${new Date().toLocaleString("pt-BR",{weekday:"short",hour:"2-digit",minute:"2-digit"})}</div>
     <div class="right rowflex">${tv?"":'<button class="btn forno sm" id="tvBtnP">📺 Modo TV</button>'}</div>`;
   w.appendChild(hero);if(!tv){const b=hero.querySelector("#tvBtnP");if(b)b.onclick=()=>enterTV("ped");}
@@ -686,10 +704,11 @@ function kbBoard(cols,porCol,cardFn){
 }
 function viewKanbanProd(tv){
   const w=el("div");
-  kbHero(w,"Quadro de Produção","Semana "+SEM+" · Produção para estoque (MTS)","kprod",tv);
+  const hero=kbHero(w,"Quadro de Produção","Semana "+semRangeOf(semMonday)+(SEM===SEM0?" (vigente)":"")+" · Produção para estoque (MTS)","kprod",tv);
+  if(!tv){const r=hero.querySelector(".right");if(r)r.insertBefore(weekNav(),r.firstChild);}
   const lotes=[];
-  cache.plano.forEach(p=>{const dias=p.dias||{};DIAS.forEach(d=>{const q=Number(dias[d.k]||0);if(q>0)lotes.push({produto:p.produto,dia:d.k,qtd:q});});});
-  if(!lotes.length){const c=el("div","card");c.appendChild(el("div","empty","Nenhum lote programado. Programe a produção na aba Planejamento (distribua as quantidades pelos dias)."));w.appendChild(c);return w;}
+  planoSem().forEach(p=>{const dias=p.dias||{};DIAS.forEach(d=>{const q=Number(dias[d.k]||0);if(q>0)lotes.push({produto:p.produto,dia:d.k,qtd:q});});});
+  if(!lotes.length){const c=el("div","card");c.appendChild(el("div","empty","Nenhum lote programado nesta semana. Use ‹ › acima para escolher a semana e programe na aba Planejamento (distribua as quantidades pelos dias)."));w.appendChild(c);return w;}
   const cols=ETAPAS_ESTOQUE.map(e=>({key:e,nome:e,icon:ETAPA_ICON[e]})).concat([{key:"Pronto",nome:"Pronto (estoque)",icon:"✅",done:true}]);
   const porCol={};cols.forEach(c=>porCol[c.key]=[]);
   lotes.forEach(L=>{const at=etapaAtual(L.produto,ETAPAS_ESTOQUE,{dia:L.dia});porCol[at||"Pronto"].push(L);});
@@ -714,7 +733,7 @@ function kcardProd(L,col,tv){
 }
 function viewKanbanPed(tv){
   const w=el("div");
-  kbHero(w,"Quadro de Pedidos","Semana "+SEM+" · Pedidos","kped",tv,'<button class="btn primary sm" id="novoPed">+ Novo pedido</button>');
+  kbHero(w,"Quadro de Pedidos","Pedidos dos clientes (independe da semana)","kped",tv,'<button class="btn primary sm" id="novoPed">+ Novo pedido</button>');
   if(!tv){const nb=w.querySelector("#novoPed");if(nb)nb.onclick=()=>modalPedido();}
   const ativos=cache.pedidos.filter(p=>p.status!=="nao");
   if(!ativos.length){const c=el("div","card");c.appendChild(el("div","empty","Nenhum pedido ativo. Use “+ Novo pedido” para lançar um. (Recusados aparecem nas Métricas.)"));w.appendChild(c);return w;}
@@ -759,15 +778,21 @@ function kcardPed(pd,col,tv){
 function viewProg(){
   const w=el("div");
   const st=el("div","sec-title");
-  st.innerHTML=`<div><h2>Programação de Produção · Semana ${SEM}</h2><p>O que produzir para compor estoque (MTS) e atender vendas. O estoque dita o ritmo.</p></div>`;
+  st.innerHTML=`<div><h2>Programação de Produção</h2><p>O que produzir para compor estoque (MTS) e atender vendas. O estoque dita o ritmo.</p></div>`;
   const add=el("button","btn primary right");add.innerHTML="+ Item do plano";add.onclick=()=>modalPlano();st.appendChild(add);
   w.appendChild(st);
+  // navegador de semanas
+  const navRow=el("div","card");navRow.style.cssText="padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap";
+  navRow.appendChild(weekNav());
+  const hint=el("span","muted");hint.style.cssText="font-size:12px";hint.textContent="Use ‹ › para programar outras semanas (anteriores ou futuras).";
+  navRow.appendChild(hint);
+  w.appendChild(navRow);
   // sub-nav dias
   const sub=el("div","subnav");
   const mkChip=(key,label,badge,isToday)=>{const c=el("button","chip"+(progDia===key?" active":"")+(isToday?" today":""));
     c.innerHTML=label+(badge!=null?` <span class="cbadge">${badge}</span>`:"");c.onclick=()=>{progDia=key;renderView();};return c;};
-  sub.appendChild(mkChip("semana","Semana toda",cache.plano.filter(p=>somaDias(p.dias)>0).length));
-  DIAS.forEach(d=>{const itens=cache.plano.filter(p=>Number((p.dias||{})[d.k]||0)>0);const q=itens.reduce((s,p)=>s+Number(p.dias[d.k]||0),0);
+  sub.appendChild(mkChip("semana","Semana toda",planoSem().filter(p=>somaDias(p.dias)>0).length));
+  DIAS.forEach(d=>{const itens=planoSem().filter(p=>Number((p.dias||{})[d.k]||0)>0);const q=itens.reduce((s,p)=>s+Number(p.dias[d.k]||0),0);
     sub.appendChild(mkChip(d.k,d.n,itens.length?fmt(q):"–",d.k===HOJE_K));});
   w.appendChild(sub);
   w.appendChild(progDia==="semana"?progSemana():progDoDia(progDia));
@@ -779,7 +804,7 @@ function progSemana(){
   const card=el("div","card pad0");const tw=el("div","tw");const tbl=el("table");
   tbl.innerHTML=`<thead><tr><th>Produto</th><th>Categoria</th><th>Destino</th><th class="n">Meta sem.</th><th class="n">Produzido</th><th style="width:130px">Progresso</th><th>Dias</th><th>Obs.</th><th></th></tr></thead>`;
   const tb=el("tbody");
-  const itens=cache.plano.filter(p=>somaDias(p.dias)>0); // consolidação: só o que foi distribuído por dia
+  const itens=planoSem().filter(p=>somaDias(p.dias)>0); // consolidação: só o que foi distribuído por dia, na semana selecionada
   if(!itens.length)tb.innerHTML=`<tr><td colspan="9"><div class="empty">Nenhum produto programado nesta semana. Distribua quantidades pelos dias em “+ Item do plano” (a venda média sozinha não entra aqui).</div></td></tr>`;
   itens.forEach(p=>{const P=prod(p.produto),meta=Number(p.meta||0),real=realizadoProduto(p.produto),pct=meta?Math.min(100,Math.round(real/meta*100)):0;
     const chips=DIAS.filter(d=>Number((p.dias||{})[d.k]||0)>0).map(d=>`<span class="daychip">${d.n} ${fmt(p.dias[d.k])}</span>`).join(" ")||'<span class="muted">—</span>';
@@ -797,7 +822,7 @@ function progSemana(){
 }
 function progDoDia(k){
   const nome=(DIAS.find(d=>d.k===k)||{}).n||k;
-  const itens=cache.plano.filter(p=>Number((p.dias||{})[k]||0)>0);
+  const itens=planoSem().filter(p=>Number((p.dias||{})[k]||0)>0);
   const card=el("div","card pad0");
   card.appendChild(cardH("🗓️","Programação de "+nome+(k===HOJE_K?" · hoje":""),`<span class="right eyebrow">${itens.length} produto(s)</span>`));
   const tw=el("div","tw");const tbl=el("table");
@@ -889,7 +914,7 @@ function modalPlano(p){
     if(!meta){toast("Informe a meta da semana.");return false;}
     if(!Object.keys(dias).length){toast("Informe ao menos um dia com quantidade.");return false;}
     // upsert por produto: evita duplicar quando o produto já tem item no plano (ex.: veio da venda média)
-    const existing=cache.plano.find(x=>x.produto===pid&&x.id!==p.id);
+    const existing=cache.plano.find(x=>x.produto===pid&&x.id!==p.id&&(x.sem||SEM0)===SEM);
     const targetId=existing?existing.id:p.id;
     put("plano",targetId,{id:targetId,produto:pid,meta,destino:$("#f_dest").value,dias,obs:$("#f_obs").value.trim(),sem:SEM});
   });
@@ -919,7 +944,7 @@ function modalPlano(p){
   // sugestão de meta a partir da venda média (referência), descontando o que já está programado
   const fmeta=$("#f_meta"),fhint=$("#f_metahint"),fprod=$("#f_prod");
   function refreshHint(preencher){const pid=fprod.value,vms=vmsDe(pid);
-    const jaProg=cache.plano.filter(x=>x.produto===pid&&x.id!==p.id).reduce((s,x)=>s+somaDias(x.dias),0);
+    const jaProg=planoSem().filter(x=>x.produto===pid&&x.id!==p.id).reduce((s,x)=>s+somaDias(x.dias),0);
     const sug=Math.max(0,vms-jaProg);
     if(vms>0){
       fhint.innerHTML=(jaProg>0
@@ -972,7 +997,7 @@ function viewApont(){
 }
 function modalApont(prefill){
   // produtos do plano primeiro, depois o resto
-  const noPlano=cache.plano.map(p=>p.produto);
+  const noPlano=planoSem().map(p=>p.produto);
   const ordered=[...cache.catalogo].sort((a,b)=>(noPlano.includes(b.id)-noPlano.includes(a.id)));
   const opts=ordered.map(c=>`<option value="${c.id}">${noPlano.includes(c.id)?"🗓️ ":""}${esc(c.nome)}</option>`).join("");
   const colOpts=PERFIS.map(p=>`<option value="${p.nome}" ${p.id===perfil?"selected":""}>${esc(p.nome)}</option>`).join("");
